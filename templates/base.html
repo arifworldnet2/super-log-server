@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Super LOG{% endblock %}</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/static/css/style.css?v=2.3">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+</head>
+<body>
+    <!-- Sidebar -->
+    <aside class="sidebar">
+        <a href="/dashboard" class="sidebar-brand">
+            <div class="logo-icon">S</div>
+            <span class="brand-text">Super LOG</span>
+            <span class="brand-tag">CORE</span>
+        </a>
+
+        <ul class="sidebar-nav">
+            <li class="{% if active_page == 'dashboard' %}active{% endif %}">
+                <a href="/dashboard">
+                    <i class="fa-solid fa-gauge-high nav-icon"></i>
+                    <span class="nav-text">Dashboard</span>
+                </a>
+            </li>
+            <li class="{% if active_page == 'router' %}active{% endif %}">
+                <a href="/router">
+                    <i class="fa-solid fa-server nav-icon"></i>
+                    <span class="nav-text">Router</span>
+                </a>
+            </li>
+            <li class="{% if active_page == 'search_log' %}active{% endif %}">
+                <a href="/search-log">
+                    <i class="fa-solid fa-clock-rotate-left nav-icon"></i>
+                    <span class="nav-text">Search Log</span>
+                </a>
+            </li>
+            <li class="{% if active_page == 'download_log' %}active{% endif %}">
+                <a href="/download-log">
+                    <i class="fa-solid fa-cloud-arrow-down nav-icon"></i>
+                    <span class="nav-text">Download Log</span>
+                </a>
+            </li>
+            <li class="{% if active_page == 'system_log' %}active{% endif %}">
+                <a href="/system-log">
+                    <i class="fa-solid fa-terminal nav-icon"></i>
+                    <span class="nav-text">System Log</span>
+                </a>
+            </li>
+
+            <!-- Traffic Report Dropdown -->
+            <li class="has-dropdown {% if active_page in ['online_users', 'find_traffic', 'traffic_report'] %}open active{% endif %}">
+                <a href="javascript:void(0)" class="dropdown-toggle-link" role="button">
+                    <i class="fa-solid fa-chart-line nav-icon"></i>
+                    <span class="nav-text">Traffic Report</span>
+                    <i class="fa-solid fa-chevron-right nav-arrow"></i>
+                </a>
+                <ul class="submenu {% if active_page in ['online_users', 'find_traffic', 'traffic_report'] %}open{% endif %}">
+                    <li class="{% if active_page == 'online_users' %}active{% endif %}">
+                        <a href="/traffic/online-users">
+                            <i class="fa-regular fa-circle-dot nav-icon" style="font-size: 10px;"></i>
+                            Online User
+                        </a>
+                    </li>
+                    <li class="{% if active_page in ['find_traffic', 'traffic_report'] %}active{% endif %}">
+                        <a href="/traffic/find">
+                            <i class="fa-solid fa-magnifying-glass-chart nav-icon" style="font-size: 11px;"></i>
+                            Find Traffic
+                        </a>
+                    </li>
+                </ul>
+            </li>
+
+            <!-- Users Dropdown -->
+            <li class="has-dropdown {% if active_page == 'users' %}open active{% endif %}">
+                <a href="javascript:void(0)" class="dropdown-toggle-link" role="button">
+                    <i class="fa-solid fa-user-gear nav-icon"></i>
+                    <span class="nav-text">Users</span>
+                    <i class="fa-solid fa-chevron-right nav-arrow"></i>
+                </a>
+                <ul class="submenu {% if active_page == 'users' %}open{% endif %}">
+                    <li class="{% if active_page == 'users' %}active{% endif %}">
+                        <a href="/users">
+                            <i class="fa-solid fa-list-check nav-icon" style="font-size: 11px;"></i>
+                            List User
+                        </a>
+                    </li>
+                </ul>
+            </li>
+        </ul>
+    </aside>
+
+    <!-- Main Content Wrapper -->
+    <div class="main-wrapper">
+        <header class="top-header">
+            <div class="header-left">
+                <button class="toggle-sidebar-btn" title="Toggle Sidebar">
+                    <i class="fa-solid fa-bars"></i>
+                </button>
+                <div class="system-status-indicator">
+                    <span class="pulse-dot"></span>
+                    <span>Super LOG Engine: Active (UDP 5514)</span>
+                </div>
+            </div>
+
+            <div class="header-right">
+                <div class="user-profile-pill">
+                    <i class="fa-solid fa-circle-user user-avatar-icon"></i>
+                    <span>arif</span>
+                    <span style="color: #94a3b8; font-size: 11px;">(Admin)</span>
+                    <a href="/logout" title="Sign Out" class="signout-link">
+                        <i class="fa-solid fa-arrow-right-from-bracket"></i>
+                    </a>
+                </div>
+            </div>
+        </header>
+
+        <main class="content-area">
+            {% block content %}{% endblock %}
+        </main>
+    </div>
+
+    <script src="/static/js/app.js?v=2.3"></script>
+    {% block scripts %}{% endblock %}
+</body>
+</html>

@@ -1,0 +1,24 @@
+[Unit]
+Description=Super LOG - ISP Syslog & MikroTik Management Server
+After=network.target
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/opt/superlog
+ExecStart=/opt/superlog/venv/bin/python server.py
+Restart=always
+RestartSec=5
+LimitNOFILE=65536
+
+# Environment variables
+Environment="PYTHONUNBUFFERED=1"
+Environment="PORT=8000"
+Environment="SYSLOG_PORT=5514"
+
+# Logging
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

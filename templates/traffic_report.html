@@ -1,0 +1,165 @@
+{% extends "base.html" %}
+
+{% block title %}Traffic Report - Super LOG{% endblock %}
+
+{% block content %}
+<div class="content-header">
+    <div style="display: flex; align-items: center; gap: 12px;">
+        <h1 class="page-title">Traffic Report</h1>
+        {% if data.level == 2 %}
+        <span class="badge badge-pill badge-primary">{{ data.year }}</span>
+        {% elif data.level == 3 %}
+        <span class="badge badge-pill badge-primary">{{ data.month }}</span>
+        {% elif data.level == 4 %}
+        <span class="badge badge-pill badge-success">{{ data.date }}</span>
+        {% endif %}
+    </div>
+
+    <div class="breadcrumb">
+        <a href="/dashboard">Home</a> / <a href="/traffic/find">Traffic</a> / 
+        {% if data.level == 1 %}
+        <span>Report</span>
+        {% elif data.level == 2 %}
+        <a href="/traffic/report?user={{ data.user }}">Report</a> / <span>{{ data.year }}</span>
+        {% elif data.level == 3 %}
+        <a href="/traffic/report?user={{ data.user }}">Report</a> / <a href="/traffic/report?user={{ data.user }}&year={{ data.year }}">{{ data.year }}</a> / <span>{{ data.month }}</span>
+        {% elif data.level == 4 %}
+        <a href="/traffic/report?user={{ data.user }}">Report</a> / <a href="/traffic/report?user={{ data.user }}&year={{ data.date[:4] }}">{{ data.date[:4] }}</a> / <a href="/traffic/report?user={{ data.user }}&year={{ data.date[:4] }}&month={{ data.date[:7] }}">{{ data.date[:7] }}</a> / <span>{{ data.date }}</span>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Search & Navigation Control Bar -->
+<div class="card" style="padding: 14px 20px; margin-bottom: 16px;">
+    <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;">
+        <div style="display: flex; align-items: center; gap: 10px;">
+            {% if data.level == 2 %}
+            <a href="/traffic/report?user={{ data.user }}" class="btn btn-outline" style="padding: 5px 14px; font-size: 13px;">
+                <i class="fa-solid fa-arrow-left"></i> Back to Years
+            </a>
+            {% elif data.level == 3 %}
+            <a href="/traffic/report?user={{ data.user }}&year={{ data.year }}" class="btn btn-outline" style="padding: 5px 14px; font-size: 13px;">
+                <i class="fa-solid fa-arrow-left"></i> Back to Months
+            </a>
+            {% elif data.level == 4 %}
+            <a href="/traffic/report?user={{ data.user }}&year={{ data.date[:4] }}&month={{ data.date[:7] }}" class="btn btn-outline" style="padding: 5px 14px; font-size: 13px;">
+                <i class="fa-solid fa-arrow-left"></i> Back to Days
+            </a>
+            {% endif %}
+
+            <div style="font-size: 14px; font-weight: 600; color: #1e293b;">
+                Customer: <span style="color: #2563eb; font-weight: 700;">{{ data.user }}</span>
+            </div>
+        </div>
+
+        <!-- Quick Switch User Form -->
+        <form method="GET" action="/traffic/report" style="display: flex; gap: 8px; align-items: center;">
+            <input type="text" name="user" class="form-control" placeholder="Search another user..." value="{{ data.user }}" style="width: 220px; height: 34px; font-size: 13px;" required>
+            <button type="submit" class="btn btn-primary" style="padding: 5px 14px; font-size: 13px; height: 34px;">
+                <i class="fa-solid fa-magnifying-glass"></i> View
+            </button>
+            <a href="/traffic/find" class="btn btn-outline" style="padding: 5px 12px; font-size: 13px; height: 34px;" title="Advanced Find">
+                <i class="fa-solid fa-sliders"></i>
+            </a>
+        </form>
+    </div>
+</div>
+
+<!-- Main Table Card matching screenshots 1, 2, 3, 4 -->
+<div class="card" style="padding: 0; overflow: hidden;">
+    {% if data.level in [1, 2, 3] %}
+    <!-- Summary Tables for Yearly, Monthly, Daily -->
+    <div class="table-responsive">
+        <table class="table traffic-table">
+            <thead>
+                <tr>
+                    <th style="width: 180px;">Date</th>
+                    <th style="width: 260px;">User</th>
+                    <th>Upload</th>
+                    <th>Download</th>
+                    <th>Total</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for r in data.rows %}
+                <tr>
+                    <td>
+                        <a href="{{ r.link }}" class="table-drilldown-link">
+                            {{ r.date }}
+                        </a>
+                    </td>
+                    <td style="color: #334155; font-weight: 500;">{{ r.user }}</td>
+                    <td style="color: #16a34a; font-weight: 600;">{{ r.upload }}</td>
+                    <td style="color: #2563eb; font-weight: 600;">{{ r.download }}</td>
+                    <td style="color: #0f172a; font-weight: 700;">{{ r.total }}</td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="5" style="text-align: center; padding: 30px; color: #94a3b8;">
+                        No traffic records found for this period.
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    {% elif data.level == 4 %}
+    <!-- Level 4: PPPoE Sessions View (Screenshot 4) -->
+    <div class="table-responsive">
+        <table class="table session-table">
+            <thead>
+                <tr>
+                    <th style="width: 45px;">SL</th>
+                    <th>User</th>
+                    <th>MAC</th>
+                    <th>IP Address</th>
+                    <th>Start Time</th>
+                    <th>End Time</th>
+                    <th>Online Time</th>
+                    <th>Upload</th>
+                    <th>Download</th>
+                    <th>Total</th>
+                    <th>Identity</th>
+                    <th>Host</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for s in data.sessions %}
+                <tr class="{% if s.is_connected %}session-active-row{% endif %}">
+                    <td style="font-weight: 600; color: #64748b;">{{ s.sl }}</td>
+                    <td style="font-weight: 600; color: #1e293b;">{{ s.user }}</td>
+                    <td style="font-family: 'JetBrains Mono', Consolas, monospace; color: #475569; font-size: 12px;">{{ s.mac }}</td>
+                    <td style="font-family: 'JetBrains Mono', Consolas, monospace; font-size: 12px;">
+                        <span class="ip-tag">{{ s.ip }}</span>
+                    </td>
+                    <td style="color: #475569; font-size: 13px;">{{ s.start_time }}</td>
+                    <td>
+                        {% if s.is_connected %}
+                        <span class="badge badge-success">
+                            <span class="pulse-dot"></span> Connected
+                        </span>
+                        {% else %}
+                        <span style="color: #475569; font-size: 13px;">{{ s.end_time }}</span>
+                        {% endif %}
+                    </td>
+                    <td style="font-weight: 600; color: #0284c7;">{{ s.online_time }}</td>
+                    <td style="color: #16a34a; font-weight: 600;">{{ s.upload }}</td>
+                    <td style="color: #2563eb; font-weight: 600;">{{ s.download }}</td>
+                    <td style="color: #0f172a; font-weight: 700;">{{ s.total }}</td>
+                    <td><span class="router-identity-pill">{{ s.identity }}</span></td>
+                    <td style="font-family: 'JetBrains Mono', Consolas, monospace; color: #64748b; font-size: 12px;">{{ s.host }}</td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="12" style="text-align: center; padding: 30px; color: #94a3b8;">
+                        No PPPoE sessions recorded on {{ data.date }}.
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

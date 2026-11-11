@@ -1,0 +1,132 @@
+{% extends "base.html" %}
+
+{% block title %}Online User - Super LOG{% endblock %}
+
+{% block content %}
+<div class="content-header">
+    <h1 class="page-title">Online User</h1>
+    <div class="breadcrumb">
+        <a href="/dashboard">Home</a> / Traffic / <span>Online User</span>
+    </div>
+</div>
+
+<div class="card" style="padding: 18px 20px;">
+    <!-- Top Filter Bar -->
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; flex-wrap: wrap; gap: 12px;">
+        <div style="font-size: 14px; font-weight: 600; color: #1e293b; display: flex; align-items: center; gap: 6px;">
+            <span>Active Customers:</span>
+            <span class="badge badge-primary" id="userCount" style="font-size: 13px;">{{ total_found }}</span>
+        </div>
+
+        <form method="GET" action="/traffic/online-users" style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
+            <div style="display: flex; align-items: center; gap: 8px;">
+                <label style="font-size: 13px; font-weight: 600; color: #475569;">Identity</label>
+                <select name="identity" class="form-control" style="width: 170px; height: 34px; font-size: 13px;" onchange="this.form.submit()">
+                    <option value="">All Identities</option>
+                    {% for iden in identities %}
+                    <option value="{{ iden }}" {% if selected_identity == iden %}selected{% endif %}>{{ iden }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <input type="text" name="q" class="form-control" placeholder="Search User" value="{{ search_query or '' }}" style="width: 180px; height: 34px; font-size: 13px;">
+            <button type="submit" class="btn btn-primary" style="height: 34px; padding: 0 14px; font-size: 13px;">Search</button>
+            {% if search_query or selected_identity %}
+            <a href="/traffic/online-users" class="btn btn-outline" style="height: 34px; padding: 0 12px; font-size: 13px;">Reset</a>
+            {% endif %}
+
+            <button type="button" onclick="syncActiveUsersNow()" id="syncUsersBtn" class="btn btn-success" style="height: 34px; padding: 0 16px; font-size: 13px;">
+                <i class="fa-solid fa-arrows-rotate"></i> Sync from MikroTik
+            </button>
+        </form>
+    </div>
+
+    <!-- Online Users Table -->
+    <div class="table-responsive">
+        <table class="table">
+            <thead>
+                <tr>
+                    <th style="width: 45px;">SL</th>
+                    <th>User Name</th>
+                    <th>MAC</th>
+                    <th>Address</th>
+                    <th>Login Time</th>
+                    <th>Online</th>
+                    <th>Upload</th>
+                    <th>Download</th>
+                    <th>Identity</th>
+                    <th>Host</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for u in users %}
+                <tr>
+                    <td style="font-weight: 600; color: #64748b;">{{ u.sl or loop.index }}</td>
+                    <td>
+                        <a href="/traffic/report?user={{ u.username }}" class="table-drilldown-link" title="Click to view full Traffic Report">
+                            {{ u.username }}
+                        </a>
+                    </td>
+                    <td style="font-family: 'JetBrains Mono', Consolas, monospace; font-size: 12px; color: #475569;">{{ u.mac }}</td>
+                    <td><span class="ip-tag">{{ u.address }}</span></td>
+                    <td style="color: #475569; font-size: 13px;">{{ u.login_time }}</td>
+                    <td style="font-weight: 600; color: #0284c7;">{{ u.online_duration }}</td>
+                    <td style="color: #16a34a; font-weight: 600;">{{ u.upload }}</td>
+                    <td style="color: #2563eb; font-weight: 600;">{{ u.download }}</td>
+                    <td><span class="router-identity-pill">{{ u.identity }}</span></td>
+                    <td style="font-family: 'JetBrains Mono', Consolas, monospace; font-size: 12px; color: #64748b;">{{ u.host }}</td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="10" style="text-align: center; padding: 30px; color: #94a3b8;">
+                        No online active users found. Click "Sync from MikroTik" to refresh active connections.
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    <!-- Pagination Controls -->
+    {% if total_found > 0 %}
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 18px; font-size: 13px; color: #64748b; flex-wrap: wrap; gap: 12px;">
+        <div>Showing {{ (page - 1) * page_size + 1 }} to {{ [(page * page_size), total_found]|min }} of <b>{{ total_found }}</b> online users</div>
+        <div style="display: flex; gap: 8px; align-items: center;">
+            {% if page > 1 %}
+            <a href="?page={{ page - 1 }}{% if search_query %}&q={{ search_query }}{% endif %}{% if selected_identity %}&identity={{ selected_identity }}{% endif %}" class="btn btn-outline" style="height: 32px; padding: 0 12px; font-size: 12px;">&laquo; Previous</a>
+            {% endif %}
+            <span class="badge badge-primary" style="padding: 6px 12px; font-size: 12px; font-weight: 700;">Page {{ page }} of {{ total_pages }}</span>
+            {% if page < total_pages %}
+            <a href="?page={{ page + 1 }}{% if search_query %}&q={{ search_query }}{% endif %}{% if selected_identity %}&identity={{ selected_identity }}{% endif %}" class="btn btn-outline" style="height: 32px; padding: 0 12px; font-size: 12px;">Next &raquo;</a>
+            {% endif %}
+        </div>
+    </div>
+    {% endif %}
+</div>
+
+<script>
+async function syncActiveUsersNow() {
+    const btn = document.getElementById("syncUsersBtn");
+    const origHtml = btn.innerHTML;
+    btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Syncing from MikroTik...';
+    btn.disabled = true;
+
+    try {
+        const res = await fetch("/api/traffic/sync-users", { method: "POST" });
+        const json = await res.json();
+        if (json.success) {
+            alert(`Sync Successful! Loaded ${json.synced} active PPPoE customers directly from MikroTik.`);
+            window.location.reload();
+        } else {
+            alert(`Sync Failed: ${json.error || 'Unknown error'}`);
+            btn.innerHTML = origHtml;
+            btn.disabled = false;
+        }
+    } catch(err) {
+        alert("Error connecting to server for API sync.");
+        btn.innerHTML = origHtml;
+        btn.disabled = false;
+    }
+}
+</script>
+{% endblock %}

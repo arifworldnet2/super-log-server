@@ -1,0 +1,148 @@
+{% extends "base.html" %}
+
+{% block title %}Search Log - Super LOG{% endblock %}
+
+{% block content %}
+<div class="content-header">
+    <h1 class="page-title">Search Log</h1>
+</div>
+
+<div class="card">
+    <form id="searchLogForm" method="GET" action="/search-log" onsubmit="performSearchLog(event); return false;">
+        <div class="form-grid">
+            <div class="form-group">
+                <label>Date</label>
+                <input type="date" name="date" class="form-control" value="{{ selected_date or '' }}">
+            </div>
+
+            <div class="form-group">
+                <label>Host / Router</label>
+                <select name="host" class="form-control">
+                    <option value="">All Routers / Hosts</option>
+                    {% for h in hosts %}
+                    <option value="{{ h.router_identity or h.host }}" {% if selected_host and (selected_host == h.router_identity or selected_host == h.host or selected_host == h.name) %}selected{% endif %}>{{ h.name }} ({{ h.router_identity or h.host }})</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label>User (PPPoE / Customer)</label>
+                <input type="text" id="searchUser" name="user" class="form-control" value="{{ selected_user or '' }}" placeholder="e.g. mc@cmh032" onkeydown="if(event.key === 'Enter'){ performSearchLog(event); return false; }">
+            </div>
+
+            <div class="form-group">
+                <label>MAC</label>
+                <input type="text" name="mac" class="form-control" value="{{ selected_mac or '' }}" placeholder="e.g. 30:07:5C:...">
+            </div>
+
+            <div class="form-group">
+                <label>Src IP & Port</label>
+                <div class="input-split">
+                    <input type="text" name="src_ip" class="form-control" value="{{ selected_src_ip or '' }}" placeholder="Src IP" style="flex: 2;">
+                    <input type="text" name="src_port" class="form-control" value="{{ selected_src_port or '' }}" placeholder="Port" style="flex: 1;">
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label>Dst IP & Port</label>
+                <div class="input-split">
+                    <input type="text" name="dst_ip" class="form-control" value="{{ selected_dst_ip or '' }}" placeholder="Dst IP" style="flex: 2;">
+                    <input type="text" name="dst_port" class="form-control" value="{{ selected_dst_port or '' }}" placeholder="Port" style="flex: 1;">
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label>NAT IP & Port</label>
+                <div class="input-split">
+                    <input type="text" name="nat_ip" class="form-control" value="{{ selected_nat_ip or '' }}" placeholder="NAT IP" style="flex: 2;">
+                    <input type="text" name="nat_port" class="form-control" value="{{ selected_nat_port or '' }}" placeholder="Port" style="flex: 1;">
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label>Time Range</label>
+                <div style="display: flex; gap: 15px; align-items: center; flex-wrap: wrap;">
+                    <div class="time-range-group">
+                        <span style="font-size: 13px; color: #555;">From</span>
+                        <select name="from_h">
+                            {% for i in range(24) %}<option value="{{ '%02d' % i }}" {% if i == 0 %}selected{% endif %}>{{ '%02d' % i }}</option>{% endfor %}
+                        </select>
+                        :
+                        <select name="from_m">
+                            {% for i in range(60) %}<option value="{{ '%02d' % i }}" {% if i == 0 %}selected{% endif %}>{{ '%02d' % i }}</option>{% endfor %}
+                        </select>
+                        :
+                        <select name="from_s">
+                            {% for i in range(60) %}<option value="{{ '%02d' % i }}" {% if i == 0 %}selected{% endif %}>{{ '%02d' % i }}</option>{% endfor %}
+                        </select>
+                    </div>
+
+                    <div class="time-range-group">
+                        <span style="font-size: 13px; color: #555;">To</span>
+                        <select name="to_h">
+                            {% for i in range(24) %}<option value="{{ '%02d' % i }}" {% if i == 23 %}selected{% endif %}>{{ '%02d' % i }}</option>{% endfor %}
+                        </select>
+                        :
+                        <select name="to_m">
+                            {% for i in range(60) %}<option value="{{ '%02d' % i }}" {% if i == 59 %}selected{% endif %}>{{ '%02d' % i }}</option>{% endfor %}
+                        </select>
+                        :
+                        <select name="to_s">
+                            {% for i in range(60) %}<option value="{{ '%02d' % i }}" {% if i == 59 %}selected{% endif %}>{{ '%02d' % i }}</option>{% endfor %}
+                        </select>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div style="margin-top: 20px; display: flex; gap: 10px;">
+            <button type="button" onclick="performSearchLog(event)" class="btn btn-primary" style="padding: 8px 24px;"><i class="fas fa-search"></i> Search Logs</button>
+            <button type="button" class="btn btn-secondary" onclick="resetSearchForm()" style="padding: 8px 18px;"><i class="fas fa-undo"></i> Reset</button>
+        </div>
+    </form>
+</div>
+
+<!-- Search Results -->
+<div class="card" style="padding: 15px 20px;">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+        <div class="card-title" style="margin-bottom: 0;">Search Results <span id="resultsCount" style="font-size: 13px; font-weight: normal; color: #64748b;">{{ results_count_text }}</span></div>
+    </div>
+    <div class="table-responsive">
+        <table class="table">
+            <thead>
+                <tr>
+                    <th>Timestamp</th>
+                    <th>Host / Router</th>
+                    <th>Proto</th>
+                    <th>Source (IP:Port)</th>
+                    <th>NAT (IP:Port)</th>
+                    <th>Destination (IP:Port)</th>
+                    <th>User</th>
+                </tr>
+            </thead>
+            <tbody id="logResultsBody">
+                {% for log in initial_logs %}
+                <tr>
+                    <td style="white-space: nowrap;">{{ log.timestamp }}</td>
+                    <td><b>{{ log.identity or log.host }}</b></td>
+                    <td><span class="badge {% if log.proto == 'TCP' %}badge-info{% else %}badge-warning{% endif %}">{{ log.proto }}</span></td>
+                    <td style="white-space: nowrap;">{{ log.src_ip }}:{{ log.src_port }}</td>
+                    <td style="white-space: nowrap;">{{ log.nat_ip }}:{{ log.nat_port }}</td>
+                    <td style="white-space: nowrap;">
+                        {% if log.as_info %}
+                        <span class="dst-ip-tooltip" title="{{ log.as_info }}">
+                            {{ log.dst_ip }}:{{ log.dst_port }}
+                            <i class="fas fa-info-circle" style="color: #2563eb; font-size: 11px; margin-left: 4px;" title="{{ log.as_info }}"></i>
+                        </span>
+                        {% else %}
+                        <span>{{ log.dst_ip }}:{{ log.dst_port }}</span>
+                        {% endif %}
+                    </td>
+                    <td><small><b>{{ log.username or '-' }}</b></small></td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

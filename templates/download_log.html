@@ -1,0 +1,106 @@
+{% extends "base.html" %}
+
+{% block title %}Download Log - Super LOG{% endblock %}
+
+{% block content %}
+<div class="content-header">
+    <h1 class="page-title">Download Log</h1>
+</div>
+
+<div class="card">
+    <form action="/api/logs/download-excel" method="GET">
+        <div class="form-grid">
+            <div class="form-group">
+                <label>Date</label>
+                <input type="date" name="date" class="form-control" value="{{ dates[0] if dates else '' }}">
+            </div>
+
+            <div class="form-group">
+                <label>Host / Router</label>
+                <select name="host" class="form-control">
+                    <option value="">All Routers / Hosts</option>
+                    {% for h in hosts %}
+                    <option value="{{ h.router_identity or h.host }}">{{ h.name }} ({{ h.router_identity or h.host }})</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label>User (PPPoE / Customer)</label>
+                <input type="text" name="user" class="form-control" placeholder="e.g. mc@cmh032">
+            </div>
+            </div>
+
+            <div class="form-group">
+                <label>MAC</label>
+                <input type="text" name="mac" class="form-control" placeholder="">
+            </div>
+
+            <div class="form-group">
+                <label>Src IP & Port</label>
+                <div class="input-split">
+                    <input type="text" name="src_ip" class="form-control" placeholder="Src IP" style="flex: 2;">
+                    <input type="text" name="src_port" class="form-control" placeholder="Port" style="flex: 1;">
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label>Dst IP & Port</label>
+                <div class="input-split">
+                    <input type="text" name="dst_ip" class="form-control" placeholder="Dst IP" style="flex: 2;">
+                    <input type="text" name="dst_port" class="form-control" placeholder="Port" style="flex: 1;">
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label>NAT IP & Port</label>
+                <div class="input-split">
+                    <input type="text" name="nat_ip" class="form-control" placeholder="NAT IP" style="flex: 2;">
+                    <input type="text" name="nat_port" class="form-control" placeholder="Port" style="flex: 1;">
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label>Time Range</label>
+                <div style="display: flex; gap: 15px; align-items: center; flex-wrap: wrap;">
+                    <div class="time-range-group">
+                        <span style="font-size: 13px; color: #555;">From</span>
+                        <select name="from_h">
+                            {% for i in range(24) %}<option value="{{ '%02d' % i }}" {% if i == 0 %}selected{% endif %}>{{ '%02d' % i }}</option>{% endfor %}
+                        </select>
+                        :
+                        <select name="from_m">
+                            {% for i in range(60) %}<option value="{{ '%02d' % i }}" {% if i == 0 %}selected{% endif %}>{{ '%02d' % i }}</option>{% endfor %}
+                        </select>
+                        :
+                        <select name="from_s">
+                            {% for i in range(60) %}<option value="{{ '%02d' % i }}" {% if i == 0 %}selected{% endif %}>{{ '%02d' % i }}</option>{% endfor %}
+                        </select>
+                    </div>
+
+                    <div class="time-range-group">
+                        <span style="font-size: 13px; color: #555;">To</span>
+                        <select name="to_h">
+                            {% for i in range(24) %}<option value="{{ '%02d' % i }}" {% if i == 23 %}selected{% endif %}>{{ '%02d' % i }}</option>{% endfor %}
+                        </select>
+                        :
+                        <select name="to_m">
+                            {% for i in range(60) %}<option value="{{ '%02d' % i }}" {% if i == 59 %}selected{% endif %}>{{ '%02d' % i }}</option>{% endfor %}
+                        </select>
+                        :
+                        <select name="to_s">
+                            {% for i in range(60) %}<option value="{{ '%02d' % i }}" {% if i == 59 %}selected{% endif %}>{{ '%02d' % i }}</option>{% endfor %}
+                        </select>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div style="margin-top: 20px;">
+            <button type="submit" class="btn btn-success" style="border: 1px solid #28a745; background-color: #fff; color: #28a745; font-weight: 500;">
+                <i class="fa-solid fa-file-excel"></i> Export Excel
+            </button>
+        </div>
+    </form>
+</div>
+{% endblock %}

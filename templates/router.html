@@ -1,0 +1,531 @@
+{% extends "base.html" %}
+
+{% block title %}Routers - Super LOG{% endblock %}
+
+{% block content %}
+<div class="content-header">
+    <h1 class="page-title">Router</h1>
+    <div class="breadcrumb">
+        <a href="/dashboard">Home</a> / Router
+    </div>
+</div>
+
+<!-- Live Server & Syslog Packet Ingestion Status Bar -->
+<div style="background: #ffffff; border: 1px solid #dee2e6; border-radius: 4px; padding: 12px 18px; margin-bottom: 16px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
+    <div style="display: flex; align-items: center; gap: 14px; flex-wrap: wrap;">
+        <span class="badge badge-success" style="padding: 5px 10px; font-size: 12px; font-weight: 600;">
+            <i class="fa-solid fa-satellite-dish"></i> Syslog Receiver Active
+        </span>
+        <span style="font-size: 13px; color: #333;">Listening: <b>UDP 103.137.108.70:5514</b></span>
+        <span style="color: #ccc;">|</span>
+        <span style="font-size: 13px; color: #333;">Packets Received: <b id="statTotalPackets" style="color: #007bff; font-size: 14px;">0</b></span>
+        <span style="color: #ccc;">|</span>
+        <span style="font-size: 13px; color: #333;">Last Packet: <b id="statLastPacket" style="color: #28a745;">None yet</b></span>
+    </div>
+    <div>
+        <button type="button" class="btn" style="background-color: #343a40; color: #fff; padding: 5px 12px; font-size: 12px;" onclick="toggleLiveMonitor()">
+            <i class="fa-solid fa-terminal"></i> Live Log Stream (<span id="streamState">Show</span>)
+        </button>
+    </div>
+</div>
+
+<!-- Collapsible Live Log Stream Terminal -->
+<div id="liveMonitorBox" style="display: none; background: #1e1e1e; border: 1px solid #333; border-radius: 4px; padding: 12px 16px; margin-bottom: 16px; color: #d4d4d4; font-family: Consolas, monospace; font-size: 12px; max-height: 220px; overflow-y: auto;">
+    <div style="color: #888; margin-bottom: 6px; display: flex; justify-content: space-between;">
+        <span><i class="fa-solid fa-circle" style="color: #28a745; font-size: 8px;"></i> LIVE INCOMING SYSLOG UDP STREAM (Auto-refreshing every 2s)</span>
+        <span id="streamPktCount">0 entries</span>
+    </div>
+    <div id="liveStreamLogs" style="line-height: 1.6;">
+        <span style="color: #666;">Waiting for incoming syslog packets from MikroTik...</span>
+    </div>
+</div>
+
+<div class="card" style="padding: 15px 20px;">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+        <select class="form-control" style="width: 160px; height: 34px;">
+            <option>Active Router</option>
+            <option>All Routers</option>
+            <option>Disabled Routers</option>
+        </select>
+        <button class="btn btn-primary" onclick="openModal('addRouterModal')">
+            <i class="fa-solid fa-plus"></i> Add New Router
+        </button>
+    </div>
+
+    <div class="table-responsive">
+        <table class="table">
+            <thead>
+                <tr>
+                    <th style="width: 30px;">#</th>
+                    <th>Name</th>
+                    <th>Router Identity</th>
+                    <th>Router Type</th>
+                    <th>NAT Identity</th>
+                    <th>Host</th>
+                    <th style="text-align: center;">Connection</th>
+                    <th style="text-align: center;">Status</th>
+                    <th style="text-align: center;">IPv6</th>
+                    <th style="text-align: center;">Accounting</th>
+                    <th style="text-align: center;">Action</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for r in routers %}
+                <tr>
+                    <td>{{ r.id }}</td>
+                    <td style="font-weight: 500;">{{ r.name }}</td>
+                    <td>{{ r.router_identity }}</td>
+                    <td>{{ r.router_type }}</td>
+                    <td>{{ r.nat_identity or '' }}</td>
+                    <td style="font-family: monospace;">{{ r.host }}</td>
+                    <td style="text-align: center;">
+                        <span id="conn-badge-{{ r.id }}" class="badge badge-success" style="cursor: pointer; padding: 4px 8px;" onclick="quickCheckConnection({{ r.id }})" title="Click to test live connection">
+                            <i class="fa-solid fa-circle" style="font-size: 8px; color: #fff;"></i> Online
+                        </span>
+                    </td>
+                    <td style="text-align: center;">
+                        <button onclick="toggleRouterSetting({{ r.id }}, 'status')" class="btn-toggle {% if r.status %}enable{% else %}disable{% endif %}">
+                            {% if r.status %}Enable{% else %}Disable{% endif %}
+                        </button>
+                    </td>
+                    <td style="text-align: center;">
+                        <button onclick="toggleRouterSetting({{ r.id }}, 'ipv6')" class="btn-toggle {% if r.ipv6 %}enable{% else %}disable{% endif %}">
+                            {% if r.ipv6 %}Enable{% else %}Disable{% endif %}
+                        </button>
+                    </td>
+                    <td style="text-align: center;">
+                        <button onclick="toggleRouterSetting({{ r.id }}, 'accounting')" class="btn-toggle {% if r.accounting %}enable{% else %}disable{% endif %}">
+                            {% if r.accounting %}Enable{% else %}Disable{% endif %}
+                        </button>
+                    </td>
+                    <td style="text-align: center; white-space: nowrap;">
+                        <button onclick="openExportModal({{ r.id }}, '{{ r.name }}')" class="btn" style="background-color: #28a745; color: #fff; padding: 4px 10px; font-size: 11px; font-weight: 600; border-radius: 3px; margin-right: 6px;" title="Export MikroTik Configuration Script">
+                            <i class="fa-solid fa-file-export"></i> Export
+                        </button>
+                        <div class="action-icons" style="display: inline-flex; vertical-align: middle; gap: 8px;">
+                            <a href="javascript:void(0)" onclick="openEditModal({{ r.id }})" class="action-icon" title="Edit Router"><i class="fa-regular fa-pen-to-square"></i></a>
+                            <a href="javascript:void(0)" onclick="quickCheckConnection({{ r.id }})" class="action-icon" title="Test Live Connection"><i class="fa-solid fa-network-wired"></i></a>
+                            <a href="javascript:void(0)" onclick="deleteRouter({{ r.id }})" class="action-icon" title="Delete Router"><i class="fa-regular fa-trash-can"></i></a>
+                            <a href="javascript:location.reload()" class="action-icon" title="Sync / Refresh"><i class="fa-solid fa-arrows-rotate"></i></a>
+                        </div>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- Add Router Modal matching reference image -->
+<div class="modal" id="addRouterModal">
+    <div class="modal-dialog modal-large">
+        <form action="/api/routers/add" method="POST" id="addRouterForm">
+            <input type="hidden" name="router_identity" id="modalRouterIdentity">
+            
+            <div style="padding: 25px 30px;">
+                <!-- Row 1 -->
+                <div class="modal-grid-3">
+                    <div class="form-group">
+                        <label style="font-weight: 600; font-size: 14px; color: #222;">Router Name</label>
+                        <input type="text" name="name" id="modalRouterName" class="form-control" placeholder="enter router name">
+                    </div>
+                    <div class="form-group">
+                        <label style="font-weight: 600; font-size: 14px; color: #222;">Host</label>
+                        <input type="text" name="host" id="modalHost" class="form-control" placeholder="enter ip address" required>
+                    </div>
+                    <div class="form-group">
+                        <label style="font-weight: 600; font-size: 14px; color: #222;">API Port</label>
+                        <input type="number" name="api_port" id="modalApiPort" class="form-control" value="8728" required>
+                    </div>
+                </div>
+
+                <!-- Row 2 -->
+                <div class="modal-grid-3">
+                    <div class="form-group">
+                        <label style="font-weight: 600; font-size: 14px; color: #222;">API Username</label>
+                        <input type="text" name="api_username" id="modalApiUser" class="form-control" placeholder="enter api user">
+                    </div>
+                    <div class="form-group">
+                        <label style="font-weight: 600; font-size: 14px; color: #222;">API Password</label>
+                        <input type="password" name="api_password" id="modalApiPass" class="form-control" placeholder="enter api pass">
+                    </div>
+                    <div class="form-group">
+                        <label style="font-weight: 600; font-size: 14px; color: #222;">Router Type</label>
+                        <select name="router_type" class="form-control" required>
+                            <option value="">Choose...</option>
+                            <option value="NAT Router">NAT Router</option>
+                            <option value="PPPoE Router">PPPoE Router</option>
+                            <option value="Hotspot Router">Hotspot Router</option>
+                        </select>
+                    </div>
+                </div>
+
+                <!-- API Test Result Banner -->
+                <div id="apiTestStatus" style="display: none; margin-top: 10px;"></div>
+
+                <!-- Action Buttons matching image -->
+                <div style="display: flex; gap: 12px; margin-top: 25px; align-items: center;">
+                    <button type="button" class="btn btn-secondary" style="padding: 8px 22px; font-size: 14px; font-weight: 500;" onclick="closeModal('addRouterModal')">
+                        Close
+                    </button>
+                    <button type="button" id="testApiBtn" class="btn" style="background-color: #17a2b8; color: #fff; padding: 8px 20px; font-size: 14px; font-weight: 500;" onclick="testMikrotikApi()">
+                        <i class="fa-solid fa-network-wired"></i> Test API
+                    </button>
+                    <button type="submit" class="btn btn-primary" style="padding: 8px 22px; font-size: 14px; font-weight: 500;">
+                        Add Router
+                    </button>
+                </div>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Export Script Modal -->
+<div class="modal" id="exportScriptModal">
+    <div class="modal-dialog modal-large" style="width: 780px;">
+        <div class="modal-header">
+            <h3 class="modal-title" id="exportModalTitle" style="font-size: 16px; font-weight: 600;">
+                <i class="fa-solid fa-code" style="color: #007bff; margin-right: 6px;"></i> MikroTik Export Script
+            </h3>
+            <button type="button" class="modal-close" onclick="closeModal('exportScriptModal')">&times;</button>
+        </div>
+        <div class="modal-body" style="padding: 20px;">
+            <div id="exportLoading" style="text-align: center; padding: 30px; font-size: 14px; color: #555;">
+                <i class="fa-solid fa-spinner fa-spin fa-2x" style="color: #007bff; margin-bottom: 10px;"></i><br>
+                Connecting to MikroTik API & Fetching IP Pools / Prefixes...
+            </div>
+            <div id="exportContent" style="display: none;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                    <span style="font-size: 13px; color: #555;">
+                        <i class="fa-solid fa-check-circle" style="color: #28a745;"></i> Auto-fetched IP Pools from MikroTik
+                    </span>
+                    <span id="prefixCountBadge" class="badge badge-info" style="font-size: 11px;">0 IP Prefixes</span>
+                </div>
+                <pre id="scriptPre" style="background: #1e1e1e; color: #d4d4d4; padding: 16px; border-radius: 4px; font-family: Consolas, 'Courier New', monospace; font-size: 13px; line-height: 1.5; max-height: 380px; overflow-y: auto; white-space: pre-wrap; word-break: break-all; border: 1px solid #333;"></pre>
+            </div>
+        </div>
+        <div class="modal-footer" style="display: flex; justify-content: space-between; align-items: center;">
+            <button type="button" class="btn btn-secondary" onclick="closeModal('exportScriptModal')">Close</button>
+            <div style="display: flex; gap: 10px;">
+                <button type="button" class="btn" style="background-color: #17a2b8; color: #fff;" onclick="copyExportScript()" id="copyScriptBtn">
+                    <i class="fa-regular fa-copy"></i> Copy Script
+                </button>
+                <a id="downloadScriptLink" href="#" class="btn btn-primary">
+                    <i class="fa-solid fa-download"></i> Download .rsc
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Edit Router Modal -->
+<div class="modal" id="editRouterModal">
+    <div class="modal-dialog modal-large">
+        <form action="/api/routers/edit" method="POST" id="editRouterForm">
+            <input type="hidden" name="router_id" id="editRouterId">
+            <div style="padding: 25px 30px;">
+                <h3 style="font-size: 16px; font-weight: 600; margin-bottom: 18px; color: #222;">
+                    <i class="fa-regular fa-pen-to-square" style="color: #007bff; margin-right: 6px;"></i> Edit Router
+                </h3>
+
+                <!-- Row 1 -->
+                <div class="modal-grid-3">
+                    <div class="form-group">
+                        <label style="font-weight: 600; font-size: 14px; color: #222;">Router Name</label>
+                        <input type="text" name="name" id="editRouterName" class="form-control" required>
+                    </div>
+                    <div class="form-group">
+                        <label style="font-weight: 600; font-size: 14px; color: #222;">Host (IP Address)</label>
+                        <input type="text" name="host" id="editHost" class="form-control" required>
+                    </div>
+                    <div class="form-group">
+                        <label style="font-weight: 600; font-size: 14px; color: #222;">API Port</label>
+                        <input type="number" name="api_port" id="editApiPort" class="form-control" required>
+                    </div>
+                </div>
+
+                <!-- Row 2 -->
+                <div class="modal-grid-3">
+                    <div class="form-group">
+                        <label style="font-weight: 600; font-size: 14px; color: #222;">API Username</label>
+                        <input type="text" name="api_username" id="editApiUser" class="form-control">
+                    </div>
+                    <div class="form-group">
+                        <label style="font-weight: 600; font-size: 14px; color: #222;">API Password</label>
+                        <input type="password" name="api_password" id="editApiPass" class="form-control">
+                    </div>
+                    <div class="form-group">
+                        <label style="font-weight: 600; font-size: 14px; color: #222;">Router Type</label>
+                        <select name="router_type" id="editRouterType" class="form-control" required>
+                            <option value="NAT Router">NAT Router</option>
+                            <option value="PPPoE Router">PPPoE Router</option>
+                            <option value="Hotspot Router">Hotspot Router</option>
+                        </select>
+                    </div>
+                </div>
+
+                <!-- API Test Result Banner for Edit -->
+                <div id="editApiTestStatus" style="display: none; margin-top: 10px;"></div>
+
+                <!-- Action Buttons -->
+                <div style="display: flex; gap: 12px; margin-top: 25px; align-items: center;">
+                    <button type="button" class="btn btn-secondary" style="padding: 8px 22px; font-size: 14px; font-weight: 500;" onclick="closeModal('editRouterModal')">
+                        Close
+                    </button>
+                    <button type="button" id="editTestApiBtn" class="btn" style="background-color: #17a2b8; color: #fff; padding: 8px 20px; font-size: 14px; font-weight: 500;" onclick="testEditMikrotikApi()">
+                        <i class="fa-solid fa-network-wired"></i> Test API
+                    </button>
+                    <button type="submit" class="btn btn-primary" style="padding: 8px 22px; font-size: 14px; font-weight: 500;">
+                        Save Changes
+                    </button>
+                </div>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+let currentExportScript = "";
+
+// 1. Open Edit Router Modal & Pre-fill Data
+async function openEditModal(routerId) {
+    try {
+        const res = await fetch(`/api/routers/${routerId}`);
+        const data = await res.json();
+        if (data.id) {
+            document.getElementById("editRouterId").value = data.id;
+            document.getElementById("editRouterName").value = data.name || "";
+            document.getElementById("editHost").value = data.host || "";
+            document.getElementById("editApiPort").value = data.api_port || 8728;
+            document.getElementById("editApiUser").value = data.api_username || "";
+            document.getElementById("editApiPass").value = data.api_password || "";
+            document.getElementById("editRouterType").value = data.router_type || "NAT Router";
+            document.getElementById("editApiTestStatus").style.display = "none";
+            openModal("editRouterModal");
+        } else {
+            alert("Could not load router details.");
+        }
+    } catch (e) {
+        alert("Error loading router: " + e.message);
+    }
+}
+
+// 2. Test API inside Edit Modal
+async function testEditMikrotikApi() {
+    const host = document.getElementById("editHost").value.trim();
+    const port = document.getElementById("editApiPort").value.trim() || 8728;
+    const user = document.getElementById("editApiUser").value.trim();
+    const pass = document.getElementById("editApiPass").value;
+    const statusDiv = document.getElementById("editApiTestStatus");
+    const testBtn = document.getElementById("editTestApiBtn");
+
+    statusDiv.style.display = "block";
+    statusDiv.className = "alert alert-info";
+    statusDiv.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Testing connection to ' + host + ':' + port + '...';
+    testBtn.disabled = true;
+
+    try {
+        const formData = new FormData();
+        formData.append("host", host);
+        formData.append("api_port", port);
+        formData.append("api_username", user);
+        formData.append("api_password", pass);
+
+        const res = await fetch("/api/routers/test-api", { method: "POST", body: formData });
+        const data = await res.json();
+
+        if (data.success) {
+            statusDiv.className = "alert alert-success";
+            statusDiv.innerHTML = `✅ <b>Connection Successful!</b> Identity: <b>${data.identity}</b> | Version: v${data.version || ''} | Uptime: ${data.uptime || ''}`;
+        } else {
+            statusDiv.className = "alert alert-danger";
+            statusDiv.innerHTML = `❌ <b>Connection Failed:</b> ${data.error}`;
+        }
+    } catch (e) {
+        statusDiv.className = "alert alert-danger";
+        statusDiv.innerHTML = `❌ Error: ${e.message}`;
+    } finally {
+        testBtn.disabled = false;
+    }
+}
+
+// 3. Quick Connection Ping Test from Action Table Icon
+async function quickCheckConnection(routerId) {
+    const badge = document.getElementById(`conn-badge-${routerId}`);
+    if (badge) {
+        badge.className = "badge badge-warning";
+        badge.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Checking...';
+    }
+
+    try {
+        const res = await fetch(`/api/routers/${routerId}/check-connection`);
+        const data = await res.json();
+        if (data.success) {
+            if (badge) {
+                badge.className = "badge badge-success";
+                badge.innerHTML = '<i class="fa-solid fa-circle" style="font-size: 8px;"></i> Online';
+                badge.title = `Connected! Identity: ${data.identity} | Uptime: ${data.uptime} | CPU: ${data.cpu_load}%`;
+            }
+            alert(`✅ Router Connection OK!\n\nIdentity: ${data.identity}\nBoard: ${data.board_name || 'MikroTik'}\nRouterOS: ${data.version}\nUptime: ${data.uptime}\nCPU Load: ${data.cpu_load}%`);
+        } else {
+            if (badge) {
+                badge.className = "badge badge-danger";
+                badge.innerHTML = '<i class="fa-solid fa-circle" style="font-size: 8px;"></i> Offline';
+                badge.title = data.error;
+            }
+            alert(`❌ Connection Check Failed:\n${data.error}`);
+        }
+    } catch (e) {
+        if (badge) {
+            badge.className = "badge badge-danger";
+            badge.innerHTML = 'Error';
+        }
+        alert(`Error checking connection: ${e.message}`);
+    }
+}
+
+// 4. Live Syslog Packet Monitoring
+let liveMonitorActive = false;
+
+function toggleLiveMonitor() {
+    const box = document.getElementById("liveMonitorBox");
+    const state = document.getElementById("streamState");
+    if (box.style.display === "none") {
+        box.style.display = "block";
+        state.textContent = "Hide";
+        liveMonitorActive = true;
+    } else {
+        box.style.display = "none";
+        state.textContent = "Show";
+        liveMonitorActive = false;
+    }
+}
+
+async function fetchLiveSyslogStatus() {
+    try {
+        const res = await fetch("/api/syslog/live-status");
+        const data = await res.json();
+
+        document.getElementById("statTotalPackets").textContent = data.total_packets.toLocaleString();
+        if (data.last_packet_time) {
+            document.getElementById("statLastPacket").innerHTML = `${data.last_packet_time} <small style="color: #666;">(from ${data.last_host})</small>`;
+        }
+
+        if (liveMonitorActive && data.recent_packets && data.recent_packets.length > 0) {
+            const container = document.getElementById("liveStreamLogs");
+            document.getElementById("streamPktCount").textContent = `${data.recent_packets.length} packets`;
+            let logsHtml = "";
+            data.recent_packets.forEach(p => {
+                logsHtml += `<div><span style="color: #6c757d;">[${p.time}]</span> <span style="color: #28a745;">${p.host}</span>: <span style="color: #e0e0e0;">${escapeHtml(p.message)}</span></div>`;
+            });
+            container.innerHTML = logsHtml;
+        }
+    } catch (e) {}
+}
+
+function escapeHtml(str) {
+    return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
+// Start auto-polling live syslog status every 2 seconds
+setInterval(fetchLiveSyslogStatus, 2000);
+fetchLiveSyslogStatus();
+// 5. Export Script Modal
+async function openExportModal(routerId, routerName) {
+    document.getElementById("exportModalTitle").innerHTML = `<i class="fa-solid fa-code" style="color: #007bff; margin-right: 6px;"></i> MikroTik Export Script - ${routerName}`;
+    document.getElementById("exportLoading").style.display = "block";
+    document.getElementById("exportContent").style.display = "none";
+    document.getElementById("downloadScriptLink").href = `/api/routers/${routerId}/download-script`;
+    openModal("exportScriptModal");
+
+    try {
+        const res = await fetch(`/api/routers/${routerId}/export-script`);
+        const data = await res.json();
+        if (data.success) {
+            currentExportScript = data.script;
+            document.getElementById("scriptPre").textContent = data.script;
+            document.getElementById("prefixCountBadge").textContent = `${data.prefixes.length} IP Prefixes`;
+            document.getElementById("exportLoading").style.display = "none";
+            document.getElementById("exportContent").style.display = "block";
+        } else {
+            document.getElementById("exportLoading").innerHTML = `<span style="color: red;">Error: ${data.error}</span>`;
+        }
+    } catch (e) {
+        document.getElementById("exportLoading").innerHTML = `<span style="color: red;">Failed to fetch script: ${e.message}</span>`;
+    }
+}
+
+function copyExportScript() {
+    if (!currentExportScript) return;
+    navigator.clipboard.writeText(currentExportScript).then(() => {
+        const btn = document.getElementById("copyScriptBtn");
+        const orig = btn.innerHTML;
+        btn.innerHTML = '<i class="fa-solid fa-check"></i> Copied!';
+        btn.style.backgroundColor = '#28a745';
+        setTimeout(() => {
+            btn.innerHTML = orig;
+            btn.style.backgroundColor = '#17a2b8';
+        }, 2000);
+    });
+}
+
+async function testMikrotikApi() {
+    const host = document.getElementById("modalHost").value.trim();
+    const port = document.getElementById("modalApiPort").value.trim() || 8728;
+    const user = document.getElementById("modalApiUser").value.trim();
+    const pass = document.getElementById("modalApiPass").value;
+    const statusDiv = document.getElementById("apiTestStatus");
+    const testBtn = document.getElementById("testApiBtn");
+
+    if (!host) {
+        statusDiv.style.display = "block";
+        statusDiv.className = "alert alert-warning";
+        statusDiv.innerHTML = "⚠️ Please enter the <b>Host</b> (IP Address) first.";
+        return;
+    }
+
+    statusDiv.style.display = "block";
+    statusDiv.className = "alert alert-info";
+    statusDiv.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Connecting to MikroTik API at ' + host + ':' + port + '...';
+    testBtn.disabled = true;
+
+    try {
+        const formData = new FormData();
+        formData.append("host", host);
+        formData.append("api_port", port);
+        formData.append("api_username", user);
+        formData.append("api_password", pass);
+
+        const res = await fetch("/api/routers/test-api", {
+            method: "POST",
+            body: formData
+        });
+        const data = await res.json();
+
+        if (data.success) {
+            statusDiv.className = "alert alert-success";
+            let details = `✅ <b>Connection Successful!</b><br>
+                <b>Hostname (Identity):</b> ${data.identity}`;
+            if (data.board_name) details += ` | <b>Board:</b> ${data.board_name}`;
+            if (data.version) details += ` | <b>RouterOS:</b> v${data.version}`;
+            if (data.cpu_load !== undefined) details += ` | <b>CPU:</b> ${data.cpu_load}%`;
+            statusDiv.innerHTML = details;
+
+            const nameInput = document.getElementById("modalRouterName");
+            if (!nameInput.value.trim()) {
+                nameInput.value = data.identity;
+            }
+            document.getElementById("modalRouterIdentity").value = data.identity;
+        } else {
+            statusDiv.className = "alert alert-danger";
+            statusDiv.innerHTML = `❌ <b>Connection Failed:</b> ${data.error}`;
+        }
+    } catch (err) {
+        statusDiv.className = "alert alert-danger";
+        statusDiv.innerHTML = `❌ <b>Request Error:</b> ${err.message}`;
+    } finally {
+        testBtn.disabled = false;
+    }
+}
+</script>
+{% endblock %}

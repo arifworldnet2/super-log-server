@@ -1,0 +1,78 @@
+{% extends "base.html" %}
+
+{% block title %}Find Traffic - Super LOG{% endblock %}
+
+{% block content %}
+<div class="content-header">
+    <h1 class="page-title">Find Traffic</h1>
+    <div class="breadcrumb">
+        <a href="/dashboard">Home</a> / Traffic / <span>Find Traffic</span>
+    </div>
+</div>
+
+<div class="card" style="padding: 20px;">
+    <form method="GET" action="/traffic/report">
+        <div class="form-grid">
+            <div class="form-group">
+                <label>User Name</label>
+                <input type="text" name="user" class="form-control" placeholder="e.g. mc@cmh023" value="{{ user or '' }}" required>
+            </div>
+
+            <div class="form-group">
+                <label>MAC Address</label>
+                <input type="text" name="mac" class="form-control" placeholder="e.g. D4:0D:AB:19:4F:D3" value="{{ mac or '' }}">
+            </div>
+
+            <div class="form-group">
+                <label>IP Address</label>
+                <input type="text" name="ip" class="form-control" placeholder="e.g. 10.24.110.140" value="{{ ip or '' }}">
+            </div>
+
+            <div class="form-group">
+                <label>Router Identity</label>
+                <select name="identity" class="form-control">
+                    <option value="">All Routers</option>
+                    {% for iden in identities %}
+                    <option value="{{ iden }}" {% if identity == iden %}selected{% endif %}>{{ iden }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+        </div>
+
+        <div style="margin-top: 18px; display: flex; gap: 10px; align-items: center;">
+            <button type="submit" class="btn btn-primary" style="padding: 0 24px;">
+                <i class="fa-solid fa-magnifying-glass"></i> Search Customer Traffic
+            </button>
+            <a href="/traffic/find" class="btn btn-outline">Clear</a>
+        </div>
+    </form>
+</div>
+
+<!-- Quick Customer Directory Card -->
+<div class="card" style="padding: 20px;">
+    <div class="card-title">
+        <i class="fa-solid fa-users-viewfinder" style="color: #2563eb;"></i> Quick Traffic Lookup
+    </div>
+    <p style="font-size: 13px; color: #64748b; margin-bottom: 16px;">
+        Click on any active customer below to immediately view their Yearly, Monthly, Daily, and PPPoE session history:
+    </p>
+
+    <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+        <a href="/traffic/report?user=mc@cmh023" class="btn btn-outline" style="font-weight: 600; color: #2563eb; border-color: #bfdbfe; background: #eff6ff;">
+            <i class="fa-solid fa-user-check"></i> mc@cmh023
+        </a>
+        <a href="/traffic/report?user=sumon330@330" class="btn btn-outline" style="color: #0f172a;">
+            sumon330@330
+        </a>
+        <a href="/traffic/report?user=sumon287@287" class="btn btn-outline" style="color: #0f172a;">
+            sumon287@287
+        </a>
+        <a href="/traffic/report?user=sumon274@274" class="btn btn-outline" style="color: #0f172a;">
+            sumon274@274
+        </a>
+        <a href="/traffic/online-users" class="btn btn-outline" style="color: #64748b;">
+            <i class="fa-solid fa-arrow-right"></i> View all 1,538+ Online Users
+        </a>
+    </div>
+</div>
+{% endblock %}

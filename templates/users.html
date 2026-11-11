@@ -1,0 +1,103 @@
+{% extends "base.html" %}
+
+{% block title %}Users - Super LOG{% endblock %}
+
+{% block content %}
+<div class="content-header">
+    <h1 class="page-title">List User</h1>
+    <div class="breadcrumb">
+        <a href="/dashboard">Home</a> / List User
+    </div>
+</div>
+
+<div class="card" style="padding: 15px 20px;">
+    <div style="display: flex; justify-content: flex-end; margin-bottom: 15px;">
+        <button class="btn btn-primary" onclick="openModal('addUserModal')">
+            <i class="fa-solid fa-plus"></i> Add New
+        </button>
+    </div>
+
+    <div class="table-responsive">
+        <table class="table">
+            <thead>
+                <tr>
+                    <th>User Name</th>
+                    <th>Name</th>
+                    <th>Email</th>
+                    <th>Role</th>
+                    <th style="text-align: center;">Login</th>
+                    <th>Mobile</th>
+                    <th style="text-align: center;">Action</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for u in users %}
+                <tr>
+                    <td style="font-weight: 500;">{{ u.username }}</td>
+                    <td>{{ u.name }}</td>
+                    <td style="color: #555;">{{ u.email }}</td>
+                    <td>{{ u.role }}</td>
+                    <td style="text-align: center;">
+                        <span class="badge badge-success">Enable</span>
+                    </td>
+                    <td style="font-family: monospace;">{{ u.mobile or '-' }}</td>
+                    <td style="text-align: center;">
+                        <div class="action-icons" style="justify-content: center;">
+                            <a href="#" class="action-icon" title="Edit"><i class="fa-regular fa-pen-to-square"></i></a>
+                            <a href="#" class="action-icon" title="Delete"><i class="fa-solid fa-xmark"></i></a>
+                            <a href="#" class="action-icon" title="Permissions"><i class="fa-solid fa-bars-staggered"></i></a>
+                        </div>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- Add User Modal -->
+<div class="modal" id="addUserModal">
+    <div class="modal-dialog">
+        <form action="/api/users/add" method="POST">
+            <div class="modal-header">
+                <h3 class="modal-title">Add New User</h3>
+                <button type="button" class="modal-close" onclick="closeModal('addUserModal')">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label>User Name</label>
+                    <input type="text" name="username" class="form-control" placeholder="e.g. arif" required>
+                </div>
+                <div class="form-group">
+                    <label>Full Name</label>
+                    <input type="text" name="name" class="form-control" placeholder="e.g. System Admin" required>
+                </div>
+                <div class="form-group">
+                    <label>Email</label>
+                    <input type="email" name="email" class="form-control" placeholder="e.g. admin@example.com" required>
+                </div>
+                <div class="form-group">
+                    <label>Password</label>
+                    <input type="password" name="password" class="form-control" placeholder="Password" required>
+                </div>
+                <div class="form-group">
+                    <label>Role</label>
+                    <select name="role" class="form-control">
+                        <option value="Admin">Admin</option>
+                        <option value="Manager">Manager</option>
+                        <option value="Operator">Operator</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Mobile</label>
+                    <input type="text" name="mobile" class="form-control" placeholder="01877755536">
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn" style="background:#e0e0e0;" onclick="closeModal('addUserModal')">Cancel</button>
+                <button type="submit" class="btn btn-primary">Create User</button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}

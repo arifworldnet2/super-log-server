@@ -1,0 +1,28 @@
+# Byte-compiled / optimized files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Database files (CRITICAL: Do NOT commit ISP data and passwords!)
+*.db
+*.db-shm
+*.db-wal
+xtreamlog.db*
+
+# Virtual environments
+.env
+.venv
+env/
+venv/
+ENV/
+
+# Logs
+*.log
+logs/
+
+# IDE & OS files
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+Desktop.ini
