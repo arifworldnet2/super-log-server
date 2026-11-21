@@ -11,7 +11,6 @@ from typing import List, Tuple, Any
 
 sys.path.insert(0, r"F:\Antigravity\xtream_log_server")
 import database
-from server import is_ip_address
 
 # Sample data discovered from xtreamlog.db
 HOST_IP = "103.54.108.118"

@@ -36,21 +36,12 @@ def is_private_or_special(ip_str: str) -> bool:
         return False
 
 def init_as_cache():
-    """Initializes the as_cache database table and loads existing records into memory."""
+    """Loads existing AS cache records from database into memory."""
     global AS_MEMORY_CACHE
     try:
         conn = get_connection()
         cursor = conn.cursor()
-        cursor.execute("""
-            CREATE TABLE IF NOT EXISTS as_cache (
-                subnet TEXT PRIMARY KEY,
-                as_info TEXT NOT NULL,
-                org TEXT,
-                updated_at TEXT
-            )
-        """)
-        cursor.execute("CREATE INDEX IF NOT EXISTS idx_as_cache_subnet ON as_cache(subnet)")
-        cursor.execute("SELECT subnet, as_info FROM as_cache")
+        cursor.execute("SELECT subnet, as_info, org FROM as_cache")
         for row in cursor.fetchall():
             AS_MEMORY_CACHE[row["subnet"]] = row["as_info"]
         conn.close()

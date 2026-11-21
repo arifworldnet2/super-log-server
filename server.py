@@ -54,6 +54,7 @@ if sys.platform == "win32":
                     f = self._proactor.accept(sock)
                 except OSError as exc:
                     if getattr(exc, 'winerror', None) in (64, 121, 10054):
+                        self.call_soon(loop)
                         return
                     if sock.fileno() != -1:
                         self.call_exception_handler({
