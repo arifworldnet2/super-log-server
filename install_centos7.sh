@@ -13,34 +13,61 @@ if [ "$EUID" -ne 0 ]; then
   exit 1
 fi
 
-# Step 1: Fix CentOS 7 EOL Repositories (Point to vault.centos.org)
+# Step 1: Fix CentOS 7 EOL Repositories (Point to vault.centos.org 7.9.2009)
 echo "[1/7] Configuring CentOS 7 Vault repositories..."
+sed -i 's/mirrorlist/#mirrorlist/g' /etc/yum.repos.d/CentOS-*.repo 2>/dev/null || true
+sed -i 's/mirrorlist.centos.org/vault.centos.org/g' /etc/yum.repos.d/*.repo 2>/dev/null || true
+sed -i 's/#baseurl=http:\/\/mirror.centos.org/baseurl=http:\/\/vault.centos.org/g' /etc/yum.repos.d/CentOS-*.repo 2>/dev/null || true
+sed -i 's/#\s*baseurl=http:\/\/vault/baseurl=http:\/\/vault/g' /etc/yum.repos.d/*.repo 2>/dev/null || true
 sed -i 's/mirror.centos.org/vault.centos.org/g' /etc/yum.repos.d/*.repo 2>/dev/null || true
-sed -i 's/^#.*baseurl=http/baseurl=http/g' /etc/yum.repos.d/*.repo 2>/dev/null || true
-sed -i 's/^mirrorlist=http/#mirrorlist=http/g' /etc/yum.repos.d/*.repo 2>/dev/null || true
+sed -i 's/vault.centos.org\/centos\/$releasever/vault.centos.org\/7.9.2009/g' /etc/yum.repos.d/*.repo 2>/dev/null || true
+sed -i 's/vault.centos.org\/$releasever/vault.centos.org\/7.9.2009/g' /etc/yum.repos.d/*.repo 2>/dev/null || true
+sed -i 's/$releasever/7.9.2009/g' /etc/yum.repos.d/CentOS-*.repo 2>/dev/null || true
+
+yum clean all || true
 
 # Step 2: Install EPEL and Build Dependencies
 echo "[2/7] Installing dependencies & development tools..."
 yum install -y epel-release || true
+
+# Fix archived EPEL repositories
+sed -i 's|^metalink=|#metalink=|g' /etc/yum.repos.d/epel*.repo 2>/dev/null || true
+sed -i 's|^#baseurl=http://download.fedoraproject.org/pub/epel/|baseurl=https://archives.fedoraproject.org/pub/archive/epel/|g' /etc/yum.repos.d/epel*.repo 2>/dev/null || true
+sed -i 's|^baseurl=http://download.fedoraproject.org/pub/epel/|baseurl=https://archives.fedoraproject.org/pub/archive/epel/|g' /etc/yum.repos.d/epel*.repo 2>/dev/null || true
+sed -i 's/mirrorlist.centos.org/vault.centos.org/g' /etc/yum.repos.d/*.repo 2>/dev/null || true
 sed -i 's/mirror.centos.org/vault.centos.org/g' /etc/yum.repos.d/*.repo 2>/dev/null || true
-sed -i 's/^#.*baseurl=http/baseurl=http/g' /etc/yum.repos.d/*.repo 2>/dev/null || true
-sed -i 's/^mirrorlist=http/#mirrorlist=http/g' /etc/yum.repos.d/*.repo 2>/dev/null || true
+sed -i 's/$releasever/7.9.2009/g' /etc/yum.repos.d/CentOS-*.repo 2>/dev/null || true
 
+yum clean all || true
 yum groupinstall -y "Development Tools"
-yum install -y openssl11-devel libffi-devel bzip2-devel wget sqlite-devel zlib-devel git curl net-tools firewalld
+yum install -y openssl11 openssl11-devel libffi-devel bzip2-devel wget sqlite-devel zlib-devel git curl net-tools firewalld ca-certificates
 
-# Step 3: Check or Compile Python 3.10
+# Step 3: Check or Compile Python 3.10 with OpenSSL 1.1
 echo "[3/7] Setting up Python 3.10..."
 if ! command -v python3.10 &> /dev/null; then
     echo "[*] Compiling Python 3.10.14 with OpenSSL 1.1..."
+    
+    # Setup OpenSSL 1.1 unified layout
+    mkdir -p /usr/local/openssl11
+    [ ! -e /usr/local/openssl11/lib ] && ln -sf /usr/lib64/openssl11 /usr/local/openssl11/lib
+    [ ! -e /usr/local/openssl11/include ] && ln -sf /usr/include/openssl11 /usr/local/openssl11/include
+
     cd /usr/src
-    wget -q https://www.python.org/ftp/python/3.10.14/Python-3.10.14.tgz
+    if command -v curl &> /dev/null; then
+        curl -fkSL https://www.python.org/ftp/python/3.10.14/Python-3.10.14.tgz -o Python-3.10.14.tgz
+    else
+        wget --no-check-certificate -q https://www.python.org/ftp/python/3.10.14/Python-3.10.14.tgz
+    fi
     tar xzf Python-3.10.14.tgz
     cd Python-3.10.14
-    export CFLAGS=$(pkg-config --cflags openssl11)
-    export LDFLAGS=$(pkg-config --libs openssl11)
-    ./configure --enable-optimizations
+    export CFLAGS=$(pkg-config --cflags openssl11 2>/dev/null || echo "-I/usr/include/openssl11")
+    export LDFLAGS=$(pkg-config --libs openssl11 2>/dev/null || echo "-L/usr/lib64/openssl11 -lssl -lcrypto")
+    ./configure --prefix=/usr/local --with-openssl=/usr/local/openssl11
     make altinstall -j$(nproc)
+    
+    ln -sf /usr/local/bin/python3.10 /usr/bin/python3.10
+    ln -sf /usr/local/bin/pip3.10 /usr/bin/pip3.10
+    
     cd /
     rm -rf /usr/src/Python-3.10.14*
 fi
@@ -99,7 +126,9 @@ if systemctl is-active --quiet firewalld; then
     firewall-cmd --reload || true
 fi
 
-SERVER_IP=$(hostname -I | awk '{print $1}')
+SERVER_IP=$(hostname -I 2>/dev/null | awk '{print $1}')
+[ -z "$SERVER_IP" ] && SERVER_IP="<server-ip>"
+
 echo ""
 echo "=========================================================="
 echo "  [SUCCESS] Super LOG Server Installed & Started!"
