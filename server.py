@@ -7,65 +7,9 @@ import asyncio
 import psutil
 from datetime import datetime, timedelta
 from contextlib import asynccontextmanager
+import ipaddress
 
-# Robust Windows Proactor Patch for WinError 64 / 121 (Abrupt client resets during accept)
-if sys.platform == "win32":
-    try:
-        import asyncio.proactor_events as pe
-        orig_start_serving = pe.BaseProactorEventLoop._start_serving
 
-        def patched_start_serving(self, protocol_factory, sock,
-                                  sslcontext=None, server=None, backlog=100,
-                                  ssl_handshake_timeout=None,
-                                  ssl_shutdown_timeout=None):
-            def loop(f=None):
-                try:
-                    if f is not None:
-                        try:
-                            conn, addr = f.result()
-                        except OSError as exc:
-                            if getattr(exc, 'winerror', None) in (64, 121, 10054):
-                                pass
-                            else:
-                                raise
-                        else:
-                            protocol = protocol_factory()
-                            if sslcontext is not None:
-                                self._make_ssl_transport(
-                                    conn, protocol, sslcontext, server_side=True,
-                                    extra={'peername': addr}, server=server,
-                                    ssl_handshake_timeout=ssl_handshake_timeout,
-                                    ssl_shutdown_timeout=ssl_shutdown_timeout)
-                            else:
-                                self._make_socket_transport(
-                                    conn, protocol,
-                                    extra={'peername': addr}, server=server)
-                    if self.is_closed():
-                        return
-                    f = self._proactor.accept(sock)
-                except OSError as exc:
-                    if getattr(exc, 'winerror', None) in (64, 121, 10054):
-                        # Client disconnected prematurely; continue listening without closing server socket!
-                        self.call_soon(loop)
-                        return
-                    if sock.fileno() != -1:
-                        self.call_exception_handler({
-                            'message': 'Accept failed on a socket',
-                            'exception': exc,
-                            'socket': pe.trsock.TransportSocket(sock),
-                        })
-                        sock.close()
-                except pe.exceptions.CancelledError:
-                    sock.close()
-                else:
-                    self._accept_futures[sock.fileno()] = f
-                    f.add_done_callback(loop)
-
-            self.call_soon(loop)
-
-        pe.BaseProactorEventLoop._start_serving = patched_start_serving
-    except Exception as e:
-        print(f"[Windows Proactor Patch Warning] {e}")
 
 from fastapi import FastAPI, Request, Form, Query
 from fastapi.responses import HTMLResponse, RedirectResponse, StreamingResponse, JSONResponse
@@ -101,11 +45,11 @@ def clean_int(val):
 def is_ip_address(val):
     if not val or not isinstance(val, str):
         return False
-    val = val.strip()
-    parts = val.split(".")
-    if len(parts) == 4 and all(p.isdigit() and 0 <= int(p) <= 255 for p in parts):
+    try:
+        ipaddress.ip_address(val.strip())
         return True
-    return ":" in val
+    except ValueError:
+        return False
 
 
 @asynccontextmanager
@@ -419,21 +363,24 @@ def search_log_view(
                 params.append(start_ts)
                 params.append(end_ts)
 
+            has_selective_filter = bool(c_user or c_src_ip or c_mac or c_dst_ip)
+
             if c_host:
+                router_prefix = "+" if has_selective_filter else ""
                 if is_ip_address(c_host):
-                    query += " AND host = ?"
+                    query += f" AND {router_prefix}host = ?"
                     params.append(c_host)
                 else:
                     cursor.execute("SELECT name, router_identity, host FROM routers WHERE router_identity = ? OR name = ? OR host = ?", (c_host, c_host, c_host))
                     matched = cursor.fetchone()
                     if matched and matched["router_identity"]:
-                        query += " AND identity = ?"
+                        query += f" AND {router_prefix}identity = ?"
                         params.append(matched["router_identity"])
                     elif matched and matched["host"]:
-                        query += " AND host = ?"
+                        query += f" AND {router_prefix}host = ?"
                         params.append(matched["host"])
                     else:
-                        query += " AND identity = ?"
+                        query += f" AND {router_prefix}identity = ?"
                         params.append(c_host)
 
             if c_user:
@@ -449,7 +396,8 @@ def search_log_view(
                 params.append(c_src_ip)
 
             if c_src_port is not None:
-                query += " AND src_port = ?"
+                src_port_prefix = "+" if (bool(c_dst_ip or c_user or c_mac) and not bool(c_src_ip)) else ""
+                query += f" AND {src_port_prefix}src_port = ?"
                 params.append(c_src_port)
 
             if c_dst_ip:
@@ -457,15 +405,18 @@ def search_log_view(
                 params.append(c_dst_ip)
 
             if c_dst_port is not None:
-                query += " AND dst_port = ?"
+                dst_port_prefix = "+" if (bool(c_user or c_mac) and not bool(c_src_ip or c_dst_ip)) else ""
+                query += f" AND {dst_port_prefix}dst_port = ?"
                 params.append(c_dst_port)
 
             if c_nat_ip:
-                query += " AND nat_ip = ?"
+                nat_ip_prefix = "+" if bool(c_src_ip or c_user or c_mac or c_dst_ip) else ""
+                query += f" AND {nat_ip_prefix}nat_ip = ?"
                 params.append(c_nat_ip)
 
             if c_nat_port is not None:
-                query += " AND nat_port = ?"
+                nat_port_prefix = "+" if (bool(c_user or c_src_ip or c_dst_ip or c_mac) and not bool(c_nat_ip)) else ""
+                query += f" AND {nat_port_prefix}nat_port = ?"
                 params.append(c_nat_port)
 
             query += " ORDER BY timestamp DESC, id DESC LIMIT 100"
@@ -1150,61 +1101,69 @@ def search_logs(
             params.append(end_ts)
 
         c_host = clean_str(host)
+        c_user = clean_str(user)
+        c_mac = clean_str(mac)
+        c_src_ip = clean_str(src_ip)
+        c_src_port = clean_int(src_port)
+        c_dst_ip = clean_str(dst_ip)
+        c_dst_port = clean_int(dst_port)
+        c_nat_ip = clean_str(nat_ip)
+        c_nat_port = clean_int(nat_port)
+
+        has_selective_filter = bool(c_user or c_src_ip or c_mac or c_dst_ip)
+
         if c_host:
+            router_prefix = "+" if has_selective_filter else ""
             if is_ip_address(c_host):
-                query += " AND host = ?"
+                query += f" AND {router_prefix}host = ?"
                 params.append(c_host)
             else:
                 cursor.execute("SELECT name, router_identity, host FROM routers WHERE router_identity = ? OR name = ? OR host = ?", (c_host, c_host, c_host))
                 matched = cursor.fetchone()
                 if matched and matched["router_identity"]:
-                    query += " AND identity = ?"
+                    query += f" AND {router_prefix}identity = ?"
                     params.append(matched["router_identity"])
                 elif matched and matched["host"]:
-                    query += " AND host = ?"
+                    query += f" AND {router_prefix}host = ?"
                     params.append(matched["host"])
                 else:
-                    query += " AND identity = ?"
+                    query += f" AND {router_prefix}identity = ?"
                     params.append(c_host)
 
-        c_user = clean_str(user)
         if c_user:
             query += " AND username = ? COLLATE NOCASE"
             params.append(c_user)
 
-        c_mac = clean_str(mac)
         if c_mac:
             query += " AND mac = ?"
             params.append(c_mac)
 
-        c_src_ip = clean_str(src_ip)
         if c_src_ip:
             query += " AND src_ip = ?"
             params.append(c_src_ip)
 
-        c_src_port = clean_int(src_port)
         if c_src_port is not None:
-            query += " AND src_port = ?"
+            src_port_prefix = "+" if (bool(c_dst_ip or c_user or c_mac) and not bool(c_src_ip)) else ""
+            query += f" AND {src_port_prefix}src_port = ?"
             params.append(c_src_port)
 
-        c_dst_ip = clean_str(dst_ip)
         if c_dst_ip:
             query += " AND dst_ip = ?"
             params.append(c_dst_ip)
 
-        c_dst_port = clean_int(dst_port)
         if c_dst_port is not None:
-            query += " AND dst_port = ?"
+            dst_port_prefix = "+" if (bool(c_user or c_mac) and not bool(c_src_ip or c_dst_ip)) else ""
+            query += f" AND {dst_port_prefix}dst_port = ?"
             params.append(c_dst_port)
 
-        c_nat_ip = clean_str(nat_ip)
         if c_nat_ip:
-            query += " AND nat_ip = ?"
+            nat_ip_prefix = "+" if bool(c_src_ip or c_user or c_mac or c_dst_ip) else ""
+            query += f" AND {nat_ip_prefix}nat_ip = ?"
             params.append(c_nat_ip)
 
-        c_nat_port = clean_int(nat_port)
         if c_nat_port is not None:
-            query += " AND nat_port = ?"
+            nat_port_prefix = "+" if (bool(c_user or c_src_ip or c_dst_ip or c_mac) and not bool(c_nat_ip)) else ""
+            query += f" AND {nat_port_prefix}nat_port = ?"
             params.append(c_nat_port)
 
         query += " ORDER BY timestamp DESC, id DESC LIMIT 100"
@@ -1298,61 +1257,69 @@ def download_excel(
             params.append(end_ts)
 
         c_host = clean_str(host)
+        c_user = clean_str(user)
+        c_mac = clean_str(mac)
+        c_src_ip = clean_str(src_ip)
+        c_src_port = clean_int(src_port)
+        c_dst_ip = clean_str(dst_ip)
+        c_dst_port = clean_int(dst_port)
+        c_nat_ip = clean_str(nat_ip)
+        c_nat_port = clean_int(nat_port)
+
+        has_selective_filter = bool(c_user or c_src_ip or c_mac or c_dst_ip)
+
         if c_host:
+            router_prefix = "+" if has_selective_filter else ""
             if is_ip_address(c_host):
-                query += " AND host = ?"
+                query += f" AND {router_prefix}host = ?"
                 params.append(c_host)
             else:
                 cursor.execute("SELECT name, router_identity, host FROM routers WHERE router_identity = ? OR name = ? OR host = ?", (c_host, c_host, c_host))
                 matched = cursor.fetchone()
                 if matched and matched["router_identity"]:
-                    query += " AND identity = ?"
+                    query += f" AND {router_prefix}identity = ?"
                     params.append(matched["router_identity"])
                 elif matched and matched["host"]:
-                    query += " AND host = ?"
+                    query += f" AND {router_prefix}host = ?"
                     params.append(matched["host"])
                 else:
-                    query += " AND identity = ?"
+                    query += f" AND {router_prefix}identity = ?"
                     params.append(c_host)
 
-        c_user = clean_str(user)
         if c_user:
             query += " AND username = ? COLLATE NOCASE"
             params.append(c_user)
 
-        c_mac = clean_str(mac)
         if c_mac:
             query += " AND mac = ?"
             params.append(c_mac)
 
-        c_src_ip = clean_str(src_ip)
         if c_src_ip:
             query += " AND src_ip = ?"
             params.append(c_src_ip)
 
-        c_src_port = clean_int(src_port)
         if c_src_port is not None:
-            query += " AND src_port = ?"
+            src_port_prefix = "+" if (bool(c_dst_ip or c_user or c_mac) and not bool(c_src_ip)) else ""
+            query += f" AND {src_port_prefix}src_port = ?"
             params.append(c_src_port)
 
-        c_dst_ip = clean_str(dst_ip)
         if c_dst_ip:
             query += " AND dst_ip = ?"
             params.append(c_dst_ip)
 
-        c_dst_port = clean_int(dst_port)
         if c_dst_port is not None:
-            query += " AND dst_port = ?"
+            dst_port_prefix = "+" if (bool(c_user or c_mac) and not bool(c_src_ip or c_dst_ip)) else ""
+            query += f" AND {dst_port_prefix}dst_port = ?"
             params.append(c_dst_port)
 
-        c_nat_ip = clean_str(nat_ip)
         if c_nat_ip:
-            query += " AND nat_ip = ?"
+            nat_ip_prefix = "+" if bool(c_src_ip or c_user or c_mac or c_dst_ip) else ""
+            query += f" AND {nat_ip_prefix}nat_ip = ?"
             params.append(c_nat_ip)
 
-        c_nat_port = clean_int(nat_port)
         if c_nat_port is not None:
-            query += " AND nat_port = ?"
+            nat_port_prefix = "+" if (bool(c_user or c_src_ip or c_dst_ip or c_mac) and not bool(c_nat_ip)) else ""
+            query += f" AND {nat_port_prefix}nat_port = ?"
             params.append(c_nat_port)
 
         query += " ORDER BY timestamp DESC, id DESC LIMIT 5000"

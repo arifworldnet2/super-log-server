@@ -230,6 +230,7 @@ def init_db():
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_nat_nat_port_ts ON nat_logs(nat_port, timestamp DESC, id DESC);")
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_nat_mac_ts_id ON nat_logs(mac, timestamp DESC, id DESC);")
 
+
     # Ensure default Admin account exists
     cursor.execute("SELECT COUNT(*) FROM users WHERE username = 'arif'")
     if cursor.fetchone()[0] == 0:
