@@ -9,6 +9,71 @@ from datetime import datetime, timedelta
 from contextlib import asynccontextmanager
 import ipaddress
 
+# Robust Windows Proactor Patch for WinError 64 / 121 / 10054 (Premature client resets during accept)
+if sys.platform == "win32":
+    try:
+        import asyncio.proactor_events as pe
+        orig_start_serving = pe.BaseProactorEventLoop._start_serving
+
+        def patched_start_serving(self, protocol_factory, sock,
+                                  sslcontext=None, server=None, backlog=100,
+                                  ssl_handshake_timeout=None,
+                                  ssl_shutdown_timeout=None):
+            def custom_handler(loop, context):
+                exc = context.get("exception")
+                if exc and getattr(exc, "winerror", None) in (64, 121, 10054):
+                    return
+                loop.default_exception_handler(context)
+
+            self.set_exception_handler(custom_handler)
+
+            def loop(f=None):
+                try:
+                    if f is not None:
+                        try:
+                            conn, addr = f.result()
+                        except OSError as exc:
+                            if getattr(exc, 'winerror', None) in (64, 121, 10054):
+                                conn = None
+                            else:
+                                raise
+                        else:
+                            protocol = protocol_factory()
+                            if sslcontext is not None:
+                                self._make_ssl_transport(
+                                    conn, protocol, sslcontext, server_side=True,
+                                    extra={'peername': addr}, server=server,
+                                    ssl_handshake_timeout=ssl_handshake_timeout,
+                                    ssl_shutdown_timeout=ssl_shutdown_timeout)
+                            else:
+                                self._make_socket_transport(
+                                    conn, protocol,
+                                    extra={'peername': addr}, server=server)
+                    if self.is_closed():
+                        return
+                    f = self._proactor.accept(sock)
+                except OSError as exc:
+                    if getattr(exc, 'winerror', None) in (64, 121, 10054):
+                        return
+                    if sock.fileno() != -1:
+                        self.call_exception_handler({
+                            'message': 'Accept failed on a socket',
+                            'exception': exc,
+                            'socket': pe.trsock.TransportSocket(sock),
+                        })
+                        sock.close()
+                except pe.exceptions.CancelledError:
+                    sock.close()
+                else:
+                    self._accept_futures[sock.fileno()] = f
+                    f.add_done_callback(loop)
+
+            self.call_soon(loop)
+
+        pe.BaseProactorEventLoop._start_serving = patched_start_serving
+    except Exception as e:
+        print(f"[Windows Proactor Patch Warning] {e}")
+
 
 
 from fastapi import FastAPI, Request, Form, Query
@@ -90,6 +155,7 @@ def get_current_user(request: Request):
 # ====================
 
 @app.get("/", response_class=HTMLResponse)
+@app.get("/login", response_class=HTMLResponse)
 def login_page(request: Request):
     user = get_current_user(request)
     if user:
