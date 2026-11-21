@@ -226,7 +226,8 @@ def sync_all_active_pppoe_users():
     conn = get_connection()
     cursor = conn.cursor()
     cursor.execute("SELECT * FROM routers WHERE status = 1")
-    routers = cursor.fetchall()
+    routers = [dict(r) for r in cursor.fetchall()]
+    conn.close()
 
     total_synced = 0
     now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
@@ -239,6 +240,17 @@ def sync_all_active_pppoe_users():
         identity = r["router_identity"] or r["name"]
 
         if not api_user:
+            continue
+
+        # Fast socket reachability check (2 second timeout)
+        try:
+            test_sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            test_sock.settimeout(2.0)
+            if test_sock.connect_ex((host, int(api_port))) != 0:
+                test_sock.close()
+                continue
+            test_sock.close()
+        except Exception:
             continue
 
         try:
@@ -303,76 +315,81 @@ def sync_all_active_pppoe_users():
                     'host': host
                 }
 
-            # 3. Detect Disconnected Users and save their sessions into customer_usage!
-            cursor.execute("SELECT * FROM online_users WHERE host = ?", (host,))
-            prev_online_users = [dict(row) for row in cursor.fetchall()]
+            # 3. Save updates to SQLite in a quick dedicated transaction
+            db_conn = get_connection()
+            db_cursor = db_conn.cursor()
+            try:
+                db_cursor.execute("SELECT * FROM online_users WHERE host = ?", (host,))
+                prev_online_users = [dict(row) for row in db_cursor.fetchall()]
 
-            for prev_u in prev_online_users:
-                prev_name = prev_u["username"]
-                if prev_name not in fresh_users_dict:
-                    # User disconnected! Save their completed session before removing
-                    up_b = prev_u.get("upload_bytes") or 0
-                    down_b = prev_u.get("download_bytes") or 0
-                    cursor.execute("""
-                        INSERT INTO customer_usage (username, mac, address, session_id, login_time, logout_time, uptime, upload_bytes, download_bytes, upload_formatted, download_formatted, identity, host)
-                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                    """, (
-                        prev_name,
-                        prev_u.get("mac", ""),
-                        prev_u.get("address", ""),
-                        prev_u.get("session_id", ""),
-                        prev_u.get("login_time", now_str),
-                        now_str, # Disconnect timestamp
-                        prev_u.get("online_duration", "0s"),
-                        up_b,
-                        down_b,
-                        prev_u.get("upload") or format_bytes(up_b),
-                        prev_u.get("download") or format_bytes(down_b),
-                        identity,
-                        host
-                    ))
-                    # Also log to system_logs
-                    cursor.execute("""
-                        INSERT INTO system_logs (timestamp, priority, identity, host, message)
-                        VALUES (?, 'info', ?, ?, ?)
-                    """, (
-                        now_str, identity, host,
-                        f"Customer Disconnected: {prev_name} | Session Uptime: {prev_u.get('online_duration', '0s')} | Upload: {prev_u.get('upload')} | Download: {prev_u.get('download')}"
-                    ))
+                for prev_u in prev_online_users:
+                    prev_name = prev_u["username"]
+                    if prev_name not in fresh_users_dict:
+                        # User disconnected! Save their completed session before removing
+                        up_b = prev_u.get("upload_bytes") or 0
+                        down_b = prev_u.get("download_bytes") or 0
+                        db_cursor.execute("""
+                            INSERT INTO customer_usage (username, mac, address, session_id, login_time, logout_time, uptime, upload_bytes, download_bytes, upload_formatted, download_formatted, identity, host)
+                            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                        """, (
+                            prev_name,
+                            prev_u.get("mac", ""),
+                            prev_u.get("address", ""),
+                            prev_u.get("session_id", ""),
+                            prev_u.get("login_time", now_str),
+                            now_str, # Disconnect timestamp
+                            prev_u.get("online_duration", "0s"),
+                            up_b,
+                            down_b,
+                            prev_u.get("upload") or format_bytes(up_b),
+                            prev_u.get("download") or format_bytes(down_b),
+                            identity,
+                            host
+                        ))
+                        # Also log to system_logs
+                        db_cursor.execute("""
+                            INSERT INTO system_logs (timestamp, priority, identity, host, message)
+                            VALUES (?, 'info', ?, ?, ?)
+                        """, (
+                            now_str, identity, host,
+                            f"Customer Disconnected: {prev_name} | Session Uptime: {prev_u.get('online_duration', '0s')} | Upload: {prev_u.get('upload')} | Download: {prev_u.get('download')}"
+                        ))
 
-            # 4. Refresh online_users table with fresh active entries
-            cursor.execute("DELETE FROM online_users WHERE host = ?", (host,))
-            entries = [
-                (
-                    v['sl'],
-                    v['username'],
-                    v['mac'],
-                    v['address'],
-                    v['session_id'],
-                    v['login_time'],
-                    v['online_duration'],
-                    v['upload_bytes'],
-                    v['download_bytes'],
-                    v['upload'],
-                    v['download'],
-                    v['identity'],
-                    v['host']
-                )
-                for v in fresh_users_dict.values()
-            ]
+                # 4. Refresh online_users table with fresh active entries
+                db_cursor.execute("DELETE FROM online_users WHERE host = ?", (host,))
+                entries = [
+                    (
+                        v['sl'],
+                        v['username'],
+                        v['mac'],
+                        v['address'],
+                        v['session_id'],
+                        v['login_time'],
+                        v['online_duration'],
+                        v['upload_bytes'],
+                        v['download_bytes'],
+                        v['upload'],
+                        v['download'],
+                        v['identity'],
+                        v['host']
+                    )
+                    for v in fresh_users_dict.values()
+                ]
 
-            cursor.executemany("""
-                INSERT OR REPLACE INTO online_users (sl, username, mac, address, session_id, login_time, online_duration, upload_bytes, download_bytes, upload, download, identity, host)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            """, entries)
+                db_cursor.executemany("""
+                    INSERT OR REPLACE INTO online_users (sl, username, mac, address, session_id, login_time, online_duration, upload_bytes, download_bytes, upload, download, identity, host)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """, entries)
 
-            total_synced += len(entries)
+                db_conn.commit()
+                total_synced += len(entries)
+            finally:
+                db_conn.close()
+
             pool.disconnect()
         except Exception as e:
             print(f"[Sync Error on {host}] {e}")
 
-    conn.commit()
-    conn.close()
     return total_synced
 
 def generate_export_script(router_name: str, router_identity: str, host: str, prefixes: list):

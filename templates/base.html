@@ -34,19 +34,19 @@
                 </a>
             </li>
             <li class="{% if active_page == 'search_log' %}active{% endif %}">
-                <a href="/search-log">
+                <a href="/search">
                     <i class="fa-solid fa-clock-rotate-left nav-icon"></i>
                     <span class="nav-text">Search Log</span>
                 </a>
             </li>
             <li class="{% if active_page == 'download_log' %}active{% endif %}">
-                <a href="/download-log">
+                <a href="/download">
                     <i class="fa-solid fa-cloud-arrow-down nav-icon"></i>
                     <span class="nav-text">Download Log</span>
                 </a>
             </li>
             <li class="{% if active_page == 'system_log' %}active{% endif %}">
-                <a href="/system-log">
+                <a href="/system">
                     <i class="fa-solid fa-terminal nav-icon"></i>
                     <span class="nav-text">System Log</span>
                 </a>
@@ -61,7 +61,7 @@
                 </a>
                 <ul class="submenu {% if active_page in ['online_users', 'find_traffic', 'traffic_report'] %}open{% endif %}">
                     <li class="{% if active_page == 'online_users' %}active{% endif %}">
-                        <a href="/traffic/online-users">
+                        <a href="/traffic/online">
                             <i class="fa-regular fa-circle-dot nav-icon" style="font-size: 10px;"></i>
                             Online User
                         </a>
@@ -84,7 +84,7 @@
                 </a>
                 <ul class="submenu {% if active_page == 'users' %}open{% endif %}">
                     <li class="{% if active_page == 'users' %}active{% endif %}">
-                        <a href="/users">
+                        <a href="/users/list">
                             <i class="fa-solid fa-list-check nav-icon" style="font-size: 11px;"></i>
                             List User
                         </a>
@@ -112,7 +112,7 @@
                     <i class="fa-solid fa-circle-user user-avatar-icon"></i>
                     <span>arif</span>
                     <span style="color: #94a3b8; font-size: 11px;">(Admin)</span>
-                    <a href="/logout" title="Sign Out" class="signout-link">
+                    <a href="/login/destroy" title="Sign Out" class="signout-link">
                         <i class="fa-solid fa-arrow-right-from-bracket"></i>
                     </a>
                 </div>
@@ -122,6 +122,16 @@
         <main class="content-area">
             {% block content %}{% endblock %}
         </main>
+
+        <footer class="app-footer">
+            <div class="footer-left">
+                2024 - 2026 © <a href="https://arifworld.net" target="_blank">Super LOG</a>
+            </div>
+            <div class="footer-right">
+                <i class="fa-regular fa-clock" style="margin-right: 5px;"></i>
+                <span id="server-live-clock">Server Time · Loading...</span>
+            </div>
+        </footer>
     </div>
 
     <script src="/static/js/app.js?v=2.3"></script>

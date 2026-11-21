@@ -1,14 +1,27 @@
 import sqlite3
 import os
+from contextlib import contextmanager
 
 DB_PATH = os.path.join(os.path.dirname(__file__), "xtreamlog.db")
 
 def get_connection():
     conn = sqlite3.connect(DB_PATH, timeout=30.0)
     conn.row_factory = sqlite3.Row
-    conn.execute("PRAGMA journal_mode=WAL;")
-    conn.execute("PRAGMA synchronous=NORMAL;")
+    conn.execute("PRAGMA journal_mode = WAL;")
+    conn.execute("PRAGMA synchronous = NORMAL;")
+    conn.execute("PRAGMA cache_size = -64000;")
+    conn.execute("PRAGMA mmap_size = 2147483648;")
+    conn.execute("PRAGMA temp_store = MEMORY;")
+    conn.execute("PRAGMA wal_autocheckpoint = 1000;")
     return conn
+
+@contextmanager
+def get_db():
+    conn = get_connection()
+    try:
+        yield conn
+    finally:
+        conn.close()
 
 def init_db():
     conn = get_connection()
@@ -73,10 +86,16 @@ def init_db():
         identity TEXT NOT NULL UNIQUE,
         type TEXT NOT NULL,
         details TEXT NOT NULL,
+        size TEXT DEFAULT '-',
         last_check TEXT NOT NULL,
         status TEXT DEFAULT 'Success'
     )
     """)
+
+    cursor.execute("PRAGMA table_info(host_activities)")
+    host_cols = [row[1] for row in cursor.fetchall()]
+    if "size" not in host_cols:
+        cursor.execute("ALTER TABLE host_activities ADD COLUMN size TEXT DEFAULT '-'")
 
     # Online Users Table
     cursor.execute("""
@@ -157,6 +176,28 @@ def init_db():
     )
     """)
 
+    # User Feature Permissions Table
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS user_permissions (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id INTEGER NOT NULL,
+        permission_key TEXT NOT NULL,
+        is_allowed INTEGER DEFAULT 1,
+        UNIQUE(user_id, permission_key)
+    )
+    """)
+
+    # User Specific Router Permissions Table
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS user_router_permissions (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id INTEGER NOT NULL,
+        router_id INTEGER NOT NULL,
+        is_allowed INTEGER DEFAULT 1,
+        UNIQUE(user_id, router_id)
+    )
+    """)
+
     # Create Indexes for high-speed queries
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_nat_timestamp ON nat_logs(timestamp);")
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_nat_host ON nat_logs(host);")
@@ -173,6 +214,22 @@ def init_db():
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_cust_mac ON customer_usage(mac);")
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_cust_date ON customer_usage(logout_time);")
 
+    # Composite Indexes on nat_logs for zero-table-scan, zero-temp-btree searches
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_nat_ts_id ON nat_logs(timestamp DESC, id DESC);")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_nat_user_ts_id ON nat_logs(username COLLATE NOCASE, timestamp DESC, id DESC);")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_nat_src_ip_ts_id ON nat_logs(src_ip, timestamp DESC, id DESC);")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_nat_dst_ip_ts_id ON nat_logs(dst_ip, timestamp DESC, id DESC);")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_nat_nat_ip_ts_id ON nat_logs(nat_ip, timestamp DESC, id DESC);")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_nat_host_ts_id ON nat_logs(host, timestamp DESC, id DESC);")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_nat_identity_ts_id ON nat_logs(identity, timestamp DESC, id DESC);")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_nat_src_ip_port_ts ON nat_logs(src_ip, src_port, timestamp DESC, id DESC);")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_nat_dst_ip_port_ts ON nat_logs(dst_ip, dst_port, timestamp DESC, id DESC);")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_nat_nat_ip_port_ts ON nat_logs(nat_ip, nat_port, timestamp DESC, id DESC);")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_nat_src_port_ts ON nat_logs(src_port, timestamp DESC, id DESC);")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_nat_dst_port_ts ON nat_logs(dst_port, timestamp DESC, id DESC);")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_nat_nat_port_ts ON nat_logs(nat_port, timestamp DESC, id DESC);")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_nat_mac_ts_id ON nat_logs(mac, timestamp DESC, id DESC);")
+
     # Ensure default Admin account exists
     cursor.execute("SELECT COUNT(*) FROM users WHERE username = 'arif'")
     if cursor.fetchone()[0] == 0:
@@ -184,21 +241,64 @@ def init_db():
     conn.commit()
     conn.close()
 
+def get_user_permissions(user_id: int):
+    """Returns a dictionary of permission_key -> bool for the specified user."""
+    with get_db() as conn:
+        cursor = conn.cursor()
+        cursor.execute("SELECT permission_key, is_allowed FROM user_permissions WHERE user_id = ?", (user_id,))
+        rows = cursor.fetchall()
+        return {row["permission_key"]: bool(row["is_allowed"]) for row in rows}
+
+def set_user_permission(user_id: int, permission_key: str, is_allowed: bool):
+    """Sets a specific permission for a user."""
+    with get_db() as conn:
+        cursor = conn.cursor()
+        cursor.execute("""
+            INSERT INTO user_permissions (user_id, permission_key, is_allowed)
+            VALUES (?, ?, ?)
+            ON CONFLICT(user_id, permission_key) DO UPDATE SET is_allowed = excluded.is_allowed
+        """, (user_id, permission_key, 1 if is_allowed else 0))
+        conn.commit()
+
+def get_user_router_permissions(user_id: int):
+    """Returns all routers with an indicator of whether user has permission to access them."""
+    with get_db() as conn:
+        cursor = conn.cursor()
+        cursor.execute("""
+            SELECT r.id, r.name, r.router_identity, r.router_type, r.host, r.status,
+                   COALESCE(urp.is_allowed, 1) as is_allowed
+            FROM routers r
+            LEFT JOIN user_router_permissions urp 
+                   ON urp.router_id = r.id AND urp.user_id = ?
+            ORDER BY r.id ASC
+        """, (user_id,))
+        return [dict(row) for row in cursor.fetchall()]
+
+def set_user_router_permission(user_id: int, router_id: int, is_allowed: bool):
+    """Sets router access permission for a user."""
+    with get_db() as conn:
+        cursor = conn.cursor()
+        cursor.execute("""
+            INSERT INTO user_router_permissions (user_id, router_id, is_allowed)
+            VALUES (?, ?, ?)
+            ON CONFLICT(user_id, router_id) DO UPDATE SET is_allowed = excluded.is_allowed
+        """, (user_id, router_id, 1 if is_allowed else 0))
+        conn.commit()
+
 def clear_all_data():
     """Wipes all dummy/historical data, keeping only the Admin user account."""
-    conn = get_connection()
-    cursor = conn.cursor()
-    cursor.execute("DELETE FROM routers")
-    cursor.execute("DELETE FROM host_activities")
-    cursor.execute("DELETE FROM online_users")
-    cursor.execute("DELETE FROM nat_logs")
-    cursor.execute("DELETE FROM system_logs")
-    # Reset sqlite sequence counters
-    cursor.execute("DELETE FROM sqlite_sequence WHERE name IN ('routers', 'host_activities', 'online_users', 'nat_logs', 'system_logs')")
-    conn.commit()
-    conn.close()
-    print("[Database] All old data has been deleted. Ready for real MikroTik logs.")
+    with get_db() as conn:
+        cursor = conn.cursor()
+        cursor.execute("DELETE FROM routers")
+        cursor.execute("DELETE FROM host_activities")
+        cursor.execute("DELETE FROM online_users")
+        cursor.execute("DELETE FROM nat_logs")
+        cursor.execute("DELETE FROM system_logs")
+        # Reset sqlite sequence counters
+        cursor.execute("DELETE FROM sqlite_sequence WHERE name IN ('routers', 'host_activities', 'online_users', 'nat_logs', 'system_logs')")
+        conn.commit()
+        print("[Database] All old data has been deleted. Ready for real MikroTik logs.")
 
 if __name__ == "__main__":
     init_db()
-    clear_all_data()
+    # clear_all_data() removed for data safety

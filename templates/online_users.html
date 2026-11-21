@@ -14,11 +14,11 @@
     <!-- Top Filter Bar -->
     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; flex-wrap: wrap; gap: 12px;">
         <div style="font-size: 14px; font-weight: 600; color: #1e293b; display: flex; align-items: center; gap: 6px;">
-            <span>Active Customers:</span>
+            <span>Found:</span>
             <span class="badge badge-primary" id="userCount" style="font-size: 13px;">{{ total_found }}</span>
         </div>
 
-        <form method="GET" action="/traffic/online-users" style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
+        <form method="GET" action="/traffic/online" style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
             <div style="display: flex; align-items: center; gap: 8px;">
                 <label style="font-size: 13px; font-weight: 600; color: #475569;">Identity</label>
                 <select name="identity" class="form-control" style="width: 170px; height: 34px; font-size: 13px;" onchange="this.form.submit()">
@@ -32,7 +32,7 @@
             <input type="text" name="q" class="form-control" placeholder="Search User" value="{{ search_query or '' }}" style="width: 180px; height: 34px; font-size: 13px;">
             <button type="submit" class="btn btn-primary" style="height: 34px; padding: 0 14px; font-size: 13px;">Search</button>
             {% if search_query or selected_identity %}
-            <a href="/traffic/online-users" class="btn btn-outline" style="height: 34px; padding: 0 12px; font-size: 13px;">Reset</a>
+            <a href="/traffic/online" class="btn btn-outline" style="height: 34px; padding: 0 12px; font-size: 13px;">Reset</a>
             {% endif %}
 
             <button type="button" onclick="syncActiveUsersNow()" id="syncUsersBtn" class="btn btn-success" style="height: 34px; padding: 0 16px; font-size: 13px;">

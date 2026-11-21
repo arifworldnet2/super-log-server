@@ -939,3 +939,25 @@ body {
         grid-template-columns: 1fr;
     }
 }
+
+/* Application Live Footer */
+.app-footer {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 14px 28px;
+    background: #ffffff;
+    border-top: 1px solid #e2e8f0;
+    font-size: 13px;
+    color: #64748b;
+    margin-top: auto;
+}
+.app-footer a {
+    color: #2563eb;
+    text-decoration: none;
+    font-weight: 600;
+}
+.app-footer a:hover {
+    text-decoration: underline;
+}
+

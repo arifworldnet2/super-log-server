@@ -36,16 +36,21 @@
                     <td style="font-weight: 500;">{{ u.username }}</td>
                     <td>{{ u.name }}</td>
                     <td style="color: #555;">{{ u.email }}</td>
-                    <td>{{ u.role }}</td>
+                    <td><span class="badge badge-info">{{ u.role }}</span></td>
                     <td style="text-align: center;">
+                        {% if u.login_enabled %}
                         <span class="badge badge-success">Enable</span>
+                        {% else %}
+                        <span class="badge badge-danger">Disable</span>
+                        {% endif %}
                     </td>
                     <td style="font-family: monospace;">{{ u.mobile or '-' }}</td>
                     <td style="text-align: center;">
-                        <div class="action-icons" style="justify-content: center;">
-                            <a href="#" class="action-icon" title="Edit"><i class="fa-regular fa-pen-to-square"></i></a>
-                            <a href="#" class="action-icon" title="Delete"><i class="fa-solid fa-xmark"></i></a>
-                            <a href="#" class="action-icon" title="Permissions"><i class="fa-solid fa-bars-staggered"></i></a>
+                        <div class="action-icons" style="justify-content: center; gap: 8px;">
+                            <a href="javascript:void(0)" onclick="editUser({{ u.id }})" class="action-icon" title="Edit User"><i class="fa-regular fa-pen-to-square"></i></a>
+                            <a href="javascript:void(0)" onclick="deleteUser({{ u.id }}, '{{ u.username }}')" class="action-icon" title="Delete User"><i class="fa-regular fa-trash-can"></i></a>
+                            <a href="/users/permission/{{ u.id }}" class="action-icon" title="User Permission"><i class="fa-solid fa-shield-halved"></i></a>
+                            <a href="/users/router/{{ u.id }}" class="action-icon" title="User Router Permission"><i class="fa-solid fa-network-wired"></i></a>
                         </div>
                     </td>
                 </tr>
@@ -100,4 +105,163 @@
         </form>
     </div>
 </div>
+
+<!-- Edit User Modal -->
+<div class="modal" id="editUserModal">
+    <div class="modal-dialog">
+        <form id="editUserForm" onsubmit="submitEditUser(event)">
+            <input type="hidden" id="editUserId" name="user_id">
+            <div class="modal-header">
+                <h3 class="modal-title">Edit User</h3>
+                <button type="button" class="modal-close" onclick="closeModal('editUserModal')">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label>User Name</label>
+                    <input type="text" id="editUsername" name="username" class="form-control" readonly style="background-color: #f1f5f9; cursor: not-allowed;">
+                </div>
+                <div class="form-group">
+                    <label>Full Name</label>
+                    <input type="text" id="editName" name="name" class="form-control" required>
+                </div>
+                <div class="form-group">
+                    <label>Email</label>
+                    <input type="email" id="editEmail" name="email" class="form-control" required>
+                </div>
+                <div class="form-group">
+                    <label>Mobile</label>
+                    <input type="text" id="editMobile" name="mobile" class="form-control">
+                </div>
+                <div class="form-group">
+                    <label>Role</label>
+                    <select id="editRole" name="role" class="form-control">
+                        <option value="Admin">Admin</option>
+                        <option value="Manager">Manager</option>
+                        <option value="Operator">Operator</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Login Status</label>
+                    <select id="editLoginEnabled" name="login_enabled" class="form-control">
+                        <option value="1">Enabled</option>
+                        <option value="0">Disabled</option>
+                    </select>
+                </div>
+                <div class="form-group" style="margin-top: 15px;">
+                    <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
+                        <input type="checkbox" id="changePassCheck" onchange="togglePasswordField(this.checked)">
+                        <span style="font-weight: 600; color: #2563eb;">Change Password?</span>
+                    </label>
+                </div>
+                <div class="form-group" id="passwordFieldGroup" style="display: none;">
+                    <label>New Password</label>
+                    <input type="password" id="editPassword" name="password" class="form-control" placeholder="Enter new password">
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn" style="background:#e0e0e0;" onclick="closeModal('editUserModal')">Cancel</button>
+                <button type="submit" class="btn btn-primary">Save Changes</button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function editUser(userId) {
+    fetch(`/api/users/${userId}`)
+        .then(res => res.json())
+        .then(data => {
+            if (data.success) {
+                const u = data.user;
+                document.getElementById('editUserId').value = u.id;
+                document.getElementById('editUsername').value = u.username;
+                document.getElementById('editName').value = u.name;
+                document.getElementById('editEmail').value = u.email;
+                document.getElementById('editMobile').value = u.mobile || '';
+                document.getElementById('editRole').value = u.role;
+                document.getElementById('editLoginEnabled').value = u.login_enabled ? "1" : "0";
+                
+                // Reset password checkbox and field
+                document.getElementById('changePassCheck').checked = false;
+                document.getElementById('passwordFieldGroup').style.display = 'none';
+                document.getElementById('editPassword').value = '';
+                
+                openModal('editUserModal');
+            } else {
+                alert('Failed to load user details: ' + (data.error || 'User not found'));
+            }
+        })
+        .catch(err => {
+            console.error(err);
+            alert('Error fetching user data');
+        });
+}
+
+function togglePasswordField(checked) {
+    const group = document.getElementById('passwordFieldGroup');
+    group.style.display = checked ? 'block' : 'none';
+    if (!checked) {
+        document.getElementById('editPassword').value = '';
+    }
+}
+
+function submitEditUser(e) {
+    e.preventDefault();
+    const userId = document.getElementById('editUserId').value;
+    const name = document.getElementById('editName').value;
+    const email = document.getElementById('editEmail').value;
+    const mobile = document.getElementById('editMobile').value;
+    const role = document.getElementById('editRole').value;
+    const login_enabled = parseInt(document.getElementById('editLoginEnabled').value, 10);
+    const password = document.getElementById('changePassCheck').checked ? document.getElementById('editPassword').value : null;
+
+    fetch(`/api/users/${userId}/edit`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            name: name,
+            email: email,
+            mobile: mobile,
+            role: role,
+            login_enabled: login_enabled,
+            password: password
+        })
+    })
+    .then(res => res.json())
+    .then(data => {
+        if (data.success) {
+            closeModal('editUserModal');
+            location.reload();
+        } else {
+            alert('Failed to update user: ' + (data.error || 'Unknown error'));
+        }
+    })
+    .catch(err => {
+        console.error(err);
+        alert('Network error while saving user');
+    });
+}
+
+function deleteUser(userId, username) {
+    if (confirm(`Are you sure you want to permanently delete user "${username}"?`)) {
+        fetch(`/api/users/${userId}`, {
+            method: 'DELETE'
+        })
+        .then(res => res.json())
+        .then(data => {
+            if (data.success) {
+                location.reload();
+            } else {
+                alert('Failed to delete user: ' + (data.error || 'Unknown error'));
+            }
+        })
+        .catch(err => {
+            console.error(err);
+            alert('Network error while deleting user');
+        });
+    }
+}
+</script>
 {% endblock %}

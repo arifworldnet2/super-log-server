@@ -38,10 +38,12 @@ document.addEventListener("DOMContentLoaded", function () {
 function startDashboardRealtimeUpdates() {
     const cpuEl = document.getElementById("statCpuVal");
     const ramEl = document.getElementById("statRamVal");
+    const freeRamEl = document.getElementById("statFreeRamVal");
     const uptimeEl = document.getElementById("statUptimeVal");
     const usersEl = document.getElementById("statActiveUsersVal");
+    const storageEl = document.getElementById("statStorageVal");
     
-    if (!cpuEl && !ramEl) return;
+    if (!cpuEl && !ramEl && !freeRamEl) return;
 
     setInterval(async () => {
         try {
@@ -50,8 +52,10 @@ function startDashboardRealtimeUpdates() {
                 const data = await res.json();
                 if (cpuEl && data.cpu !== undefined) cpuEl.innerText = data.cpu;
                 if (ramEl && data.ram !== undefined) ramEl.innerText = data.ram;
+                if (freeRamEl && data.free_ram_gb !== undefined) freeRamEl.innerText = data.free_ram_gb;
                 if (uptimeEl && data.uptime) uptimeEl.innerText = data.uptime;
                 if (usersEl && data.active_users !== undefined) usersEl.innerText = data.active_users;
+                if (storageEl && data.app_percent !== undefined) storageEl.innerText = data.app_percent;
             }
         } catch (e) {
             // Ignore polling errors
@@ -297,7 +301,7 @@ function resetSearchForm() {
     const form = document.getElementById("searchLogForm");
     if (form) {
         form.reset();
-        window.location.href = "/search-log";
+        window.location.href = "/search";
     }
 }
 
@@ -309,14 +313,14 @@ async function performSystemLogSearch(e) {
     const params = new URLSearchParams(formData).toString();
 
     const tbody = document.getElementById("systemLogResultsBody");
-    tbody.innerHTML = `<tr><td colspan="5" style="text-align:center; padding: 20px;">Searching system logs...</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="7" style="text-align:center; padding: 20px;">Searching system logs...</td></tr>`;
 
     try {
         const response = await fetch(`/api/system-logs/search?${params}`);
         const data = await response.json();
 
         if (data.logs.length === 0) {
-            tbody.innerHTML = `<tr><td colspan="5" style="text-align:center; padding: 20px; color: #888;">No system logs found.</td></tr>`;
+            tbody.innerHTML = `<tr><td colspan="7" style="text-align:center; padding: 20px; color: #888;">No system logs found.</td></tr>`;
             return;
         }
 
@@ -329,16 +333,18 @@ async function performSystemLogSearch(e) {
             html += `
                 <tr>
                     <td>${log.timestamp}</td>
-                    <td><span class="badge ${badgeClass}">${log.priority.toUpperCase()}</span></td>
                     <td><b>${log.identity}</b></td>
-                    <td>${log.host}</td>
+                    <td style="font-family: monospace;">${log.host}</td>
+                    <td>${log.facility || 'system'}</td>
+                    <td><span class="badge ${badgeClass}">${(log.priority || 'info').toUpperCase()}</span></td>
+                    <td>${log.level || '-'}</td>
                     <td>${log.message}</td>
                 </tr>
             `;
         });
         tbody.innerHTML = html;
     } catch (err) {
-        tbody.innerHTML = `<tr><td colspan="5" style="text-align:center; color: red;">Error: ${err.message}</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="7" style="text-align:center; color: red;">Error: ${err.message}</td></tr>`;
     }
 }
 
@@ -352,3 +358,15 @@ function closeModal(id) {
     const m = document.getElementById(id);
     if (m) m.classList.remove("show");
 }
+
+// Live Server Clock
+function updateServerClock() {
+    const el = document.getElementById("server-live-clock");
+    if (!el) return;
+    const now = new Date();
+    const pad = (n) => String(n).padStart(2, "0");
+    const formatted = `${now.getFullYear()}-${pad(now.getMonth()+1)}-${pad(now.getDate())} ${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(now.getSeconds())}`;
+    el.innerText = `Server Time · ${formatted}`;
+}
+setInterval(updateServerClock, 1000);
+document.addEventListener("DOMContentLoaded", updateServerClock);

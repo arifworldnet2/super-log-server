@@ -42,10 +42,10 @@
 
 <div class="card" style="padding: 15px 20px;">
     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
-        <select class="form-control" style="width: 160px; height: 34px;">
-            <option>Active Router</option>
-            <option>All Routers</option>
-            <option>Disabled Routers</option>
+        <select class="form-control" style="width: 160px; height: 34px;" onchange="location.href='/router/filter/' + this.value">
+            <option value="0" {% if filter_type == 0 %}selected{% endif %}>All Router</option>
+            <option value="1" {% if filter_type == 1 %}selected{% endif %}>Active Router</option>
+            <option value="2" {% if filter_type == 2 %}selected{% endif %}>Inactive Router</option>
         </select>
         <button class="btn btn-primary" onclick="openModal('addRouterModal')">
             <i class="fa-solid fa-plus"></i> Add New Router
@@ -151,13 +151,24 @@
                     </div>
                     <div class="form-group">
                         <label style="font-weight: 600; font-size: 14px; color: #222;">Router Type</label>
-                        <select name="router_type" class="form-control" required>
+                        <select name="router_type" id="modalRouterType" class="form-control" required onchange="handleRouterTypeChange(this.value)">
                             <option value="">Choose...</option>
                             <option value="NAT Router">NAT Router</option>
                             <option value="PPPoE Router">PPPoE Router</option>
                             <option value="Hotspot Router">Hotspot Router</option>
                         </select>
                     </div>
+                </div>
+
+                <!-- Dynamic NAT Identity dropdown when PPPoE Router is chosen -->
+                <div class="form-group" id="natIdentityGroup" style="display: none; margin-top: 15px;">
+                    <label style="font-weight: 600; font-size: 14px; color: #222;">NAT Identity</label>
+                    <select name="nat_identity" id="modalNatIdentity" class="form-control">
+                        <option value="">Choose NAT Router...</option>
+                        {% for nr in nat_routers %}
+                        <option value="{{ nr.router_identity }}">{{ nr.name }} ({{ nr.router_identity }})</option>
+                        {% endfor %}
+                    </select>
                 </div>
 
                 <!-- API Test Result Banner -->
@@ -256,12 +267,23 @@
                     </div>
                     <div class="form-group">
                         <label style="font-weight: 600; font-size: 14px; color: #222;">Router Type</label>
-                        <select name="router_type" id="editRouterType" class="form-control" required>
+                        <select name="router_type" id="editRouterType" class="form-control" required onchange="handleEditRouterTypeChange(this.value)">
                             <option value="NAT Router">NAT Router</option>
                             <option value="PPPoE Router">PPPoE Router</option>
                             <option value="Hotspot Router">Hotspot Router</option>
                         </select>
                     </div>
+                </div>
+
+                <!-- Dynamic NAT Identity dropdown when PPPoE Router is chosen (Edit Modal) -->
+                <div class="form-group" id="editNatIdentityGroup" style="display: none; margin-top: 15px;">
+                    <label style="font-weight: 600; font-size: 14px; color: #222;">NAT Identity</label>
+                    <select name="nat_identity" id="editNatIdentity" class="form-control">
+                        <option value="">Choose NAT Router...</option>
+                        {% for nr in nat_routers %}
+                        <option value="{{ nr.router_identity }}">{{ nr.name }} ({{ nr.router_identity }})</option>
+                        {% endfor %}
+                    </select>
                 </div>
 
                 <!-- API Test Result Banner for Edit -->
@@ -287,6 +309,20 @@
 <script>
 let currentExportScript = "";
 
+function handleRouterTypeChange(type) {
+    const group = document.getElementById("natIdentityGroup");
+    if (group) {
+        group.style.display = (type === "PPPoE Router") ? "block" : "none";
+    }
+}
+
+function handleEditRouterTypeChange(type) {
+    const group = document.getElementById("editNatIdentityGroup");
+    if (group) {
+        group.style.display = (type === "PPPoE Router") ? "block" : "none";
+    }
+}
+
 // 1. Open Edit Router Modal & Pre-fill Data
 async function openEditModal(routerId) {
     try {
@@ -300,6 +336,13 @@ async function openEditModal(routerId) {
             document.getElementById("editApiUser").value = data.api_username || "";
             document.getElementById("editApiPass").value = data.api_password || "";
             document.getElementById("editRouterType").value = data.router_type || "NAT Router";
+            
+            const natSelect = document.getElementById("editNatIdentity");
+            if (natSelect) {
+                natSelect.value = data.nat_identity || "";
+            }
+            handleEditRouterTypeChange(data.router_type || "NAT Router");
+
             document.getElementById("editApiTestStatus").style.display = "none";
             openModal("editRouterModal");
         } else {

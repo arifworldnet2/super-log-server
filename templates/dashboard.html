@@ -28,11 +28,11 @@
 <div class="stats-grid">
     <div class="stat-card">
         <div class="stat-icon blue">
-            <i class="fa-solid fa-microchip"></i>
+            <i class="fa-solid fa-users"></i>
         </div>
         <div class="stat-content">
-            <div class="stat-label">CPU Load</div>
-            <div class="stat-value"><span id="statCpuVal">{{ cpu_load }}</span>%</div>
+            <div class="stat-label">Total Online User</div>
+            <div class="stat-value"><span id="statActiveUsersVal">{{ active_user_count }}</span></div>
         </div>
     </div>
 
@@ -41,8 +41,8 @@
             <i class="fa-solid fa-memory"></i>
         </div>
         <div class="stat-content">
-            <div class="stat-label">RAM Usage</div>
-            <div class="stat-value"><span id="statRamVal">{{ ram_usage }}</span>%</div>
+            <div class="stat-label">Free Memory</div>
+            <div class="stat-value"><span id="statFreeRamVal">{{ free_ram_gb }}</span> GB</div>
         </div>
     </div>
 
@@ -58,16 +58,11 @@
 
     <div class="stat-card">
         <div class="stat-icon purple">
-            <i class="fa-solid fa-network-wired"></i>
+            <i class="fa-solid fa-hard-drive"></i>
         </div>
         <div class="stat-content">
-            <div class="stat-label">Routers & Active Users</div>
-            <div class="stat-value" style="font-size: 16px;">
-                NAT: {{ nat_count }} | PPPoE: {{ pppoe_count }}
-            </div>
-            <div style="font-size: 12px; font-weight: 600; color: #16a34a; margin-top: 2px;">
-                Active Users: <span id="statActiveUsersVal">{{ active_user_count }}</span>
-            </div>
+            <div class="stat-label">Storage Usage</div>
+            <div class="stat-value"><span id="statStorageVal">{{ app_percent }}</span>%</div>
         </div>
     </div>
 </div>
@@ -120,35 +115,33 @@
 <!-- Host Activity Section -->
 <div class="card" style="padding: 18px 20px;">
     <div class="card-title">
-        <i class="fa-solid fa-satellite-dish" style="color: #2563eb;"></i> Host Activity & Connection Checks
+        <i class="fa-solid fa-satellite-dish" style="color: #2563eb;"></i> Host Activity
     </div>
     <div class="table-responsive">
         <table class="table">
             <thead>
                 <tr>
+                    <th>Host</th>
                     <th>Identity</th>
-                    <th>Type</th>
-                    <th>Details</th>
-                    <th>Last Check</th>
-                    <th>Status</th>
+                    <th>Size</th>
+                    <th style="text-align: center;">Status</th>
                 </tr>
             </thead>
             <tbody>
                 {% for act in host_activities %}
                 <tr>
+                    <td style="font-family: monospace; color: #1e293b;">{{ act.host_ip or act.host or '-' }}</td>
                     <td style="font-weight: 600; color: #1e293b;">{{ act.identity }}</td>
-                    <td style="color: #475569;">{{ act.type }}</td>
-                    <td style="color: #334155;">{{ act.details }}</td>
-                    <td style="color: #64748b; font-size: 12.5px;">{{ act.last_check }}</td>
-                    <td>
-                        <span class="badge badge-success">
+                    <td style="color: #64748b; font-family: monospace;">{{ act.size or '-' }}</td>
+                    <td style="text-align: center;">
+                        <span class="badge {% if act.status == 'Success' %}badge-success{% else %}badge-danger{% endif %}">
                             <span class="pulse-dot"></span> {{ act.status }}
                         </span>
                     </td>
                 </tr>
                 {% else %}
                 <tr>
-                    <td colspan="5" style="text-align: center; color: #94a3b8; padding: 20px;">
+                    <td colspan="4" style="text-align: center; color: #94a3b8; padding: 20px;">
                         No host activity logged yet.
                     </td>
                 </tr>

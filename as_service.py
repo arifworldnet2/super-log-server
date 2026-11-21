@@ -123,7 +123,7 @@ def batch_get_as_info(ip_list: list) -> dict:
                     "User-Agent": "SuperLOG/1.0"
                 }
             )
-            with urllib.request.urlopen(req, timeout=2.5) as resp:
+            with urllib.request.urlopen(req, timeout=1.0) as resp:
                 data = json.loads(resp.read().decode("utf-8"))
                 db_updates = []
                 now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")

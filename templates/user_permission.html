@@ -1,0 +1,312 @@
+{% extends "base.html" %}
+
+{% block title %}User Permission - Super LOG{% endblock %}
+
+{% block content %}
+<div class="content-header" style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 20px;">
+    <div>
+        <h1 class="page-title">User Permission</h1>
+        <div class="breadcrumb" style="margin-top: 4px;">
+            <a href="/dashboard">Home</a> / <a href="/users">Users</a> / <span>User Permission</span>
+        </div>
+    </div>
+    <div>
+        <a href="/users" class="btn btn-secondary" style="padding: 6px 14px; font-size: 13px;">
+            <i class="fa-solid fa-arrow-left"></i> Back to Users
+        </a>
+    </div>
+</div>
+
+<!-- User Overview Card -->
+<div class="card" style="padding: 16px 22px; margin-bottom: 22px; background: #ffffff; border-left: 4px solid #2563eb;">
+    <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px;">
+        <div style="display: flex; align-items: center; gap: 14px;">
+            <div style="width: 44px; height: 44px; border-radius: 50%; background: #eff6ff; color: #2563eb; display: flex; align-items: center; justify-content: center; font-size: 20px;">
+                <i class="fa-solid fa-user-shield"></i>
+            </div>
+            <div>
+                <div style="font-size: 16px; font-weight: 700; color: #1e293b;">
+                    {{ target_user.name }} <span style="font-size: 13px; font-weight: 400; color: #64748b;">(@{{ target_user.username }})</span>
+                </div>
+                <div style="font-size: 12.5px; color: #64748b; margin-top: 2px;">
+                    Email: <b>{{ target_user.email }}</b> &bull; Mobile: <b>{{ target_user.mobile or 'N/A' }}</b>
+                </div>
+            </div>
+        </div>
+        <div>
+            <span class="badge badge-primary" style="font-size: 12px; padding: 5px 12px;">Role: {{ target_user.role }}</span>
+            <span class="badge {% if target_user.login_enabled %}badge-success{% else %}badge-danger{% endif %}" style="font-size: 12px; padding: 5px 12px; margin-left: 6px;">
+                {% if target_user.login_enabled %}Login Enabled{% else %}Login Disabled{% endif %}
+            </span>
+        </div>
+    </div>
+</div>
+
+<!-- 3 Permission Cards Grid -->
+<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 20px;">
+    <!-- Router Permissions Card -->
+    <div class="card" style="padding: 20px; display: flex; flex-direction: column;">
+        <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 16px; padding-bottom: 12px; border-bottom: 1px solid #e2e8f0;">
+            <div style="width: 32px; height: 32px; border-radius: 6px; background: #eff6ff; color: #2563eb; display: flex; align-items: center; justify-content: center; font-size: 15px;">
+                <i class="fa-solid fa-server"></i>
+            </div>
+            <div>
+                <h3 style="font-size: 15px; font-weight: 700; color: #1e293b; margin: 0;">Router Rights</h3>
+                <span style="font-size: 12px; color: #64748b;">Manage MikroTik router operations</span>
+            </div>
+        </div>
+
+        <div style="display: flex; flex-direction: column; gap: 14px;">
+            <div class="permission-row" style="display: flex; justify-content: space-between; align-items: center;">
+                <div>
+                    <div style="font-weight: 600; font-size: 13.5px; color: #1e293b;">Router List View</div>
+                    <div style="font-size: 11.5px; color: #64748b;">Allow viewing router listing & status</div>
+                </div>
+                <label class="switch">
+                    <input type="checkbox" onchange="togglePermission({{ target_user.id }}, 'router_list', this.checked)" {% if permissions.get('router_list', True) %}checked{% endif %}>
+                    <span class="slider round"></span>
+                </label>
+            </div>
+
+            <div class="permission-row" style="display: flex; justify-content: space-between; align-items: center;">
+                <div>
+                    <div style="font-weight: 600; font-size: 13.5px; color: #1e293b;">Add Router</div>
+                    <div style="font-size: 11.5px; color: #64748b;">Create and register new MikroTik routers</div>
+                </div>
+                <label class="switch">
+                    <input type="checkbox" onchange="togglePermission({{ target_user.id }}, 'router_add', this.checked)" {% if permissions.get('router_add', True) %}checked{% endif %}>
+                    <span class="slider round"></span>
+                </label>
+            </div>
+
+            <div class="permission-row" style="display: flex; justify-content: space-between; align-items: center;">
+                <div>
+                    <div style="font-weight: 600; font-size: 13.5px; color: #1e293b;">Edit Router</div>
+                    <div style="font-size: 11.5px; color: #64748b;">Modify router IP, credentials & identity</div>
+                </div>
+                <label class="switch">
+                    <input type="checkbox" onchange="togglePermission({{ target_user.id }}, 'router_edit', this.checked)" {% if permissions.get('router_edit', True) %}checked{% endif %}>
+                    <span class="slider round"></span>
+                </label>
+            </div>
+
+            <div class="permission-row" style="display: flex; justify-content: space-between; align-items: center;">
+                <div>
+                    <div style="font-weight: 600; font-size: 13.5px; color: #1e293b;">Delete Router</div>
+                    <div style="font-size: 11.5px; color: #64748b;">Remove router and its historical configurations</div>
+                </div>
+                <label class="switch">
+                    <input type="checkbox" onchange="togglePermission({{ target_user.id }}, 'router_delete', this.checked)" {% if permissions.get('router_delete', True) %}checked{% endif %}>
+                    <span class="slider round"></span>
+                </label>
+            </div>
+
+            <div class="permission-row" style="display: flex; justify-content: space-between; align-items: center;">
+                <div>
+                    <div style="font-weight: 600; font-size: 13.5px; color: #1e293b;">Export Script</div>
+                    <div style="font-size: 11.5px; color: #64748b;">Generate and download MikroTik .rsc script</div>
+                </div>
+                <label class="switch">
+                    <input type="checkbox" onchange="togglePermission({{ target_user.id }}, 'router_export', this.checked)" {% if permissions.get('router_export', True) %}checked{% endif %}>
+                    <span class="slider round"></span>
+                </label>
+            </div>
+
+            <div class="permission-row" style="display: flex; justify-content: space-between; align-items: center;">
+                <div>
+                    <div style="font-weight: 600; font-size: 13.5px; color: #1e293b;">Sync / Check Connection</div>
+                    <div style="font-size: 11.5px; color: #64748b;">Perform live API health tests on router</div>
+                </div>
+                <label class="switch">
+                    <input type="checkbox" onchange="togglePermission({{ target_user.id }}, 'router_sync', this.checked)" {% if permissions.get('router_sync', True) %}checked{% endif %}>
+                    <span class="slider round"></span>
+                </label>
+            </div>
+        </div>
+    </div>
+
+    <!-- Log Permissions Card -->
+    <div class="card" style="padding: 20px; display: flex; flex-direction: column;">
+        <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 16px; padding-bottom: 12px; border-bottom: 1px solid #e2e8f0;">
+            <div style="width: 32px; height: 32px; border-radius: 6px; background: #ecfdf5; color: #10b981; display: flex; align-items: center; justify-content: center; font-size: 15px;">
+                <i class="fa-solid fa-clock-rotate-left"></i>
+            </div>
+            <div>
+                <h3 style="font-size: 15px; font-weight: 700; color: #1e293b; margin: 0;">Log Rights</h3>
+                <span style="font-size: 12px; color: #64748b;">Access syslog & query logs</span>
+            </div>
+        </div>
+
+        <div style="display: flex; flex-direction: column; gap: 14px;">
+            <div class="permission-row" style="display: flex; justify-content: space-between; align-items: center;">
+                <div>
+                    <div style="font-weight: 600; font-size: 13.5px; color: #1e293b;">Search Logs</div>
+                    <div style="font-size: 11.5px; color: #64748b;">Query real-time NAT and firewall logs</div>
+                </div>
+                <label class="switch">
+                    <input type="checkbox" onchange="togglePermission({{ target_user.id }}, 'log_search', this.checked)" {% if permissions.get('log_search', True) %}checked{% endif %}>
+                    <span class="slider round"></span>
+                </label>
+            </div>
+
+            <div class="permission-row" style="display: flex; justify-content: space-between; align-items: center;">
+                <div>
+                    <div style="font-weight: 600; font-size: 13.5px; color: #1e293b;">Download Excel Logs</div>
+                    <div style="font-size: 11.5px; color: #64748b;">Export CSV/Excel filtered NAT logs</div>
+                </div>
+                <label class="switch">
+                    <input type="checkbox" onchange="togglePermission({{ target_user.id }}, 'log_download', this.checked)" {% if permissions.get('log_download', True) %}checked{% endif %}>
+                    <span class="slider round"></span>
+                </label>
+            </div>
+
+            <div class="permission-row" style="display: flex; justify-content: space-between; align-items: center;">
+                <div>
+                    <div style="font-weight: 600; font-size: 13.5px; color: #1e293b;">System Logs View</div>
+                    <div style="font-size: 11.5px; color: #64748b;">View system events, errors and alerts</div>
+                </div>
+                <label class="switch">
+                    <input type="checkbox" onchange="togglePermission({{ target_user.id }}, 'log_system', this.checked)" {% if permissions.get('log_system', True) %}checked{% endif %}>
+                    <span class="slider round"></span>
+                </label>
+            </div>
+        </div>
+    </div>
+
+    <!-- Users Management Permissions Card -->
+    <div class="card" style="padding: 20px; display: flex; flex-direction: column;">
+        <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 16px; padding-bottom: 12px; border-bottom: 1px solid #e2e8f0;">
+            <div style="width: 32px; height: 32px; border-radius: 6px; background: #f5f3ff; color: #8b5cf6; display: flex; align-items: center; justify-content: center; font-size: 15px;">
+                <i class="fa-solid fa-user-gear"></i>
+            </div>
+            <div>
+                <h3 style="font-size: 15px; font-weight: 700; color: #1e293b; margin: 0;">User Rights</h3>
+                <span style="font-size: 12px; color: #64748b;">Staff user accounts administration</span>
+            </div>
+        </div>
+
+        <div style="display: flex; flex-direction: column; gap: 14px;">
+            <div class="permission-row" style="display: flex; justify-content: space-between; align-items: center;">
+                <div>
+                    <div style="font-weight: 600; font-size: 13.5px; color: #1e293b;">Users List View</div>
+                    <div style="font-size: 11.5px; color: #64748b;">Allow browsing system operator accounts</div>
+                </div>
+                <label class="switch">
+                    <input type="checkbox" onchange="togglePermission({{ target_user.id }}, 'user_list', this.checked)" {% if permissions.get('user_list', True) %}checked{% endif %}>
+                    <span class="slider round"></span>
+                </label>
+            </div>
+
+            <div class="permission-row" style="display: flex; justify-content: space-between; align-items: center;">
+                <div>
+                    <div style="font-weight: 600; font-size: 13.5px; color: #1e293b;">Add New User</div>
+                    <div style="font-size: 11.5px; color: #64748b;">Create new user credentials and roles</div>
+                </div>
+                <label class="switch">
+                    <input type="checkbox" onchange="togglePermission({{ target_user.id }}, 'user_add', this.checked)" {% if permissions.get('user_add', True) %}checked{% endif %}>
+                    <span class="slider round"></span>
+                </label>
+            </div>
+
+            <div class="permission-row" style="display: flex; justify-content: space-between; align-items: center;">
+                <div>
+                    <div style="font-weight: 600; font-size: 13.5px; color: #1e293b;">Edit User</div>
+                    <div style="font-size: 11.5px; color: #64748b;">Update account details & passwords</div>
+                </div>
+                <label class="switch">
+                    <input type="checkbox" onchange="togglePermission({{ target_user.id }}, 'user_edit', this.checked)" {% if permissions.get('user_edit', True) %}checked{% endif %}>
+                    <span class="slider round"></span>
+                </label>
+            </div>
+
+            <div class="permission-row" style="display: flex; justify-content: space-between; align-items: center;">
+                <div>
+                    <div style="font-weight: 600; font-size: 13.5px; color: #1e293b;">Delete User</div>
+                    <div style="font-size: 11.5px; color: #64748b;">Terminate operator user access</div>
+                </div>
+                <label class="switch">
+                    <input type="checkbox" onchange="togglePermission({{ target_user.id }}, 'user_delete', this.checked)" {% if permissions.get('user_delete', True) %}checked{% endif %}>
+                    <span class="slider round"></span>
+                </label>
+            </div>
+
+            <div class="permission-row" style="display: flex; justify-content: space-between; align-items: center;">
+                <div>
+                    <div style="font-weight: 600; font-size: 13.5px; color: #1e293b;">Manage Permissions</div>
+                    <div style="font-size: 11.5px; color: #64748b;">Grant or revoke feature rights</div>
+                </div>
+                <label class="switch">
+                    <input type="checkbox" onchange="togglePermission({{ target_user.id }}, 'user_permissions', this.checked)" {% if permissions.get('user_permissions', True) %}checked{% endif %}>
+                    <span class="slider round"></span>
+                </label>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+/* Modern Switch Toggle styling */
+.switch {
+  position: relative;
+  display: inline-block;
+  width: 44px;
+  height: 24px;
+}
+.switch input { 
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+.slider {
+  position: absolute;
+  cursor: pointer;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: #cbd5e1;
+  transition: .3s;
+  border-radius: 24px;
+}
+.slider:before {
+  position: absolute;
+  content: "";
+  height: 18px;
+  width: 18px;
+  left: 3px;
+  bottom: 3px;
+  background-color: white;
+  transition: .3s;
+  border-radius: 50%;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+}
+input:checked + .slider {
+  background-color: #2563eb;
+}
+input:checked + .slider:before {
+  transform: translateX(20px);
+}
+</style>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function togglePermission(userId, key, allowed) {
+    fetch(`/api/users/${userId}/permissions/toggle`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ permission_key: key, is_allowed: allowed })
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (!data.success) {
+            alert('Failed to update permission: ' + (data.error || 'Unknown error'));
+        }
+    })
+    .catch(err => {
+        console.error(err);
+        alert('Network error while updating permission');
+    });
+}
+</script>
+{% endblock %}

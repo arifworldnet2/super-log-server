@@ -65,10 +65,12 @@
         <table class="table">
             <thead>
                 <tr>
-                    <th style="width: 170px;">Timestamp</th>
+                    <th style="width: 170px;">DateTime</th>
+                    <th style="width: 150px;">Identity</th>
+                    <th style="width: 130px;">Host</th>
+                    <th style="width: 100px;">Facility</th>
                     <th style="width: 100px;">Priority</th>
-                    <th style="width: 180px;">Identity</th>
-                    <th style="width: 140px;">Host</th>
+                    <th style="width: 80px;">Level</th>
                     <th>Message</th>
                 </tr>
             </thead>
@@ -76,13 +78,15 @@
                 {% for log in initial_logs %}
                 <tr>
                     <td>{{ log.timestamp }}</td>
+                    <td><b>{{ log.identity }}</b></td>
+                    <td style="font-family: monospace;">{{ log.host }}</td>
+                    <td>{{ log.facility or 'system' }}</td>
                     <td>
                         <span class="badge {% if log.priority == 'warning' %}badge-warning{% elif log.priority in ['error', 'critical'] %}badge-danger{% else %}badge-info{% endif %}">
                             {{ log.priority|upper }}
                         </span>
                     </td>
-                    <td><b>{{ log.identity }}</b></td>
-                    <td style="font-family: monospace;">{{ log.host }}</td>
+                    <td>{{ log.level or '-' }}</td>
                     <td>{{ log.message }}</td>
                 </tr>
                 {% endfor %}
