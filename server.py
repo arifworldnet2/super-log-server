@@ -467,7 +467,8 @@ def search_log_view(
                 params.append(c_src_port)
 
             if c_dst_ip:
-                query += " AND dst_ip = ?"
+                dst_ip_prefix = "+" if bool(c_src_ip or c_user or c_mac) else ""
+                query += f" AND {dst_ip_prefix}dst_ip = ?"
                 params.append(c_dst_ip)
 
             if c_dst_port is not None:
@@ -1214,7 +1215,8 @@ def search_logs(
             params.append(c_src_port)
 
         if c_dst_ip:
-            query += " AND dst_ip = ?"
+            dst_ip_prefix = "+" if bool(c_src_ip or c_user or c_mac) else ""
+            query += f" AND {dst_ip_prefix}dst_ip = ?"
             params.append(c_dst_ip)
 
         if c_dst_port is not None:
@@ -1370,7 +1372,8 @@ def download_excel(
             params.append(c_src_port)
 
         if c_dst_ip:
-            query += " AND dst_ip = ?"
+            dst_ip_prefix = "+" if bool(c_src_ip or c_user or c_mac) else ""
+            query += f" AND {dst_ip_prefix}dst_ip = ?"
             params.append(c_dst_ip)
 
         if c_dst_port is not None:

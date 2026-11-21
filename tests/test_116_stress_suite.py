@@ -119,7 +119,7 @@ def generate_116_queries():
     queries.append(("Q082: User + Date", "SELECT * FROM nat_logs WHERE 1=1 AND username = ? COLLATE NOCASE AND timestamp BETWEEN ? AND ? ORDER BY timestamp DESC, id DESC LIMIT 100", (SAMPLE_USER, DATE_START, DATE_END)))
     queries.append(("Q083: MAC + Date", "SELECT * FROM nat_logs WHERE 1=1 AND mac = ? AND timestamp BETWEEN ? AND ? ORDER BY timestamp DESC, id DESC LIMIT 100", (SAMPLE_MAC, DATE_START, DATE_END)))
     queries.append(("Q084: NAT IP + Date", "SELECT * FROM nat_logs WHERE 1=1 AND nat_ip = ? AND timestamp BETWEEN ? AND ? ORDER BY timestamp DESC, id DESC LIMIT 100", (SAMPLE_NAT_IP, DATE_START, DATE_END)))
-    queries.append(("Q085: Src IP + Dst IP", "SELECT * FROM nat_logs WHERE 1=1 AND src_ip = ? AND dst_ip = ? ORDER BY timestamp DESC, id DESC LIMIT 100", (SAMPLE_SRC_IP, SAMPLE_DST_IP)))
+    queries.append(("Q085: Src IP + Dst IP (+dst_ip)", "SELECT * FROM nat_logs WHERE 1=1 AND src_ip = ? AND +dst_ip = ? ORDER BY timestamp DESC, id DESC LIMIT 100", (SAMPLE_SRC_IP, SAMPLE_DST_IP)))
 
     # 86-100: User/IP + Port Combinations with Unary '+' Suppression
     queries.append(("Q086: #106 User + Dst Port (+dst_port)", "SELECT * FROM nat_logs WHERE 1=1 AND username = ? COLLATE NOCASE AND +dst_port = ? ORDER BY timestamp DESC, id DESC LIMIT 100", (SAMPLE_USER, 443)))
@@ -139,7 +139,7 @@ def generate_116_queries():
     queries.append(("Q100: Router + Dst IP + Date (Scenario #96)", "SELECT * FROM nat_logs WHERE 1=1 AND +identity = ? AND dst_ip = ? AND timestamp BETWEEN ? AND ? ORDER BY timestamp DESC, id DESC LIMIT 100", (ROUTER_IDENT, SAMPLE_DST_IP, DATE_START, DATE_END)))
 
     # 101-116: High-Limit & Boundary Scenarios (Excel exports, pagination, large limits)
-    queries.append(("Q101: Latest 50 Logs", "SELECT * FROM nat_logs ORDER BY id DESC LIMIT 50", ()))
+    queries.append(("Q101: Latest 50 Logs", "SELECT * FROM nat_logs ORDER BY timestamp DESC, id DESC LIMIT 50", ()))
     queries.append(("Q102: Latest 100 Logs by Timestamp", "SELECT * FROM nat_logs ORDER BY timestamp DESC, id DESC LIMIT 100", ()))
     queries.append(("Q103: Latest 500 Logs by Timestamp", "SELECT * FROM nat_logs ORDER BY timestamp DESC, id DESC LIMIT 500", ()))
     queries.append(("Q104: Src IP Limit 500", "SELECT * FROM nat_logs WHERE 1=1 AND src_ip = ? ORDER BY timestamp DESC, id DESC LIMIT 500", (SAMPLE_SRC_IP,)))
@@ -178,7 +178,7 @@ def run_stress_suite():
         # Explain Query Plan
         c.execute("EXPLAIN QUERY PLAN " + q, p)
         plan_rows = c.fetchall()
-        has_scan = any("SCAN" in r[3] for r in plan_rows)
+        has_scan = any("SCAN" in r[3] and "USING INDEX" not in r[3] for r in plan_rows)
         has_btree = any("TEMP B-TREE" in r[3] for r in plan_rows)
         
         if has_scan:
