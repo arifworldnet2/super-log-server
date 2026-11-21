@@ -199,7 +199,7 @@ def init_db():
     """)
 
     # Create Indexes for high-speed queries
-    cursor.execute("CREATE INDEX IF NOT EXISTS idx_nat_timestamp ON nat_logs(timestamp);")
+    cursor.execute("DROP INDEX IF EXISTS idx_nat_timestamp;")
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_nat_host ON nat_logs(host);")
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_nat_user ON nat_logs(username);")
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_nat_src_ip ON nat_logs(src_ip);")
@@ -229,6 +229,9 @@ def init_db():
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_nat_dst_port_ts ON nat_logs(dst_port, timestamp DESC, id DESC);")
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_nat_nat_port_ts ON nat_logs(nat_port, timestamp DESC, id DESC);")
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_nat_mac_ts_id ON nat_logs(mac, timestamp DESC, id DESC);")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_nat_src_dst_port_ts ON nat_logs(src_ip, dst_port, timestamp DESC, id DESC);")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_nat_host_user_ts ON nat_logs(host, username COLLATE NOCASE, timestamp DESC, id DESC);")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_nat_ident_user_ts ON nat_logs(identity, username COLLATE NOCASE, timestamp DESC, id DESC);")
 
 
     # Ensure default Admin account exists

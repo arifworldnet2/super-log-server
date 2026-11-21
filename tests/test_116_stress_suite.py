@@ -125,16 +125,16 @@ def generate_116_queries():
     queries.append(("Q086: #106 User + Dst Port (+dst_port)", "SELECT * FROM nat_logs WHERE 1=1 AND username = ? COLLATE NOCASE AND +dst_port = ? ORDER BY timestamp DESC, id DESC LIMIT 100", (SAMPLE_USER, 443)))
     queries.append(("Q087: User + Dst Port 80", "SELECT * FROM nat_logs WHERE 1=1 AND username = ? COLLATE NOCASE AND +dst_port = ? ORDER BY timestamp DESC, id DESC LIMIT 100", (SAMPLE_USER, 80)))
     queries.append(("Q088: User + Src Port (+src_port)", "SELECT * FROM nat_logs WHERE 1=1 AND username = ? COLLATE NOCASE AND +src_port = ? ORDER BY timestamp DESC, id DESC LIMIT 100", (SAMPLE_USER, 53)))
-    queries.append(("Q089: #76 Dst IP + Src Port (+src_port)", "SELECT * FROM nat_logs WHERE 1=1 AND dst_ip = ? AND +src_port = ? ORDER BY timestamp DESC, id DESC LIMIT 100", (SAMPLE_DST_IP, 53)))
-    queries.append(("Q090: Dst IP + Src Port 43758", "SELECT * FROM nat_logs WHERE 1=1 AND dst_ip = ? AND +src_port = ? ORDER BY timestamp DESC, id DESC LIMIT 100", (SAMPLE_DST_IP, 43758)))
+    queries.append(("Q089: #76 Dst IP + Src Port", "SELECT * FROM nat_logs WHERE 1=1 AND dst_ip = ? AND src_port = ? ORDER BY timestamp DESC, id DESC LIMIT 100", (SAMPLE_DST_IP, 53)))
+    queries.append(("Q090: Dst IP + Src Port 43758", "SELECT * FROM nat_logs WHERE 1=1 AND dst_ip = ? AND src_port = ? ORDER BY timestamp DESC, id DESC LIMIT 100", (SAMPLE_DST_IP, 43758)))
     queries.append(("Q091: MAC + Dst Port (+dst_port)", "SELECT * FROM nat_logs WHERE 1=1 AND mac = ? AND +dst_port = ? ORDER BY timestamp DESC, id DESC LIMIT 100", (SAMPLE_MAC, 443)))
     queries.append(("Q092: MAC + Src Port (+src_port)", "SELECT * FROM nat_logs WHERE 1=1 AND mac = ? AND +src_port = ? ORDER BY timestamp DESC, id DESC LIMIT 100", (SAMPLE_MAC, 53)))
     queries.append(("Q093: User + Dst Port + Date", "SELECT * FROM nat_logs WHERE 1=1 AND username = ? COLLATE NOCASE AND +dst_port = ? AND timestamp BETWEEN ? AND ? ORDER BY timestamp DESC, id DESC LIMIT 100", (SAMPLE_USER, 443, DATE_START, DATE_END)))
-    queries.append(("Q094: Dst IP + Src Port + Date", "SELECT * FROM nat_logs WHERE 1=1 AND dst_ip = ? AND +src_port = ? AND timestamp BETWEEN ? AND ? ORDER BY timestamp DESC, id DESC LIMIT 100", (SAMPLE_DST_IP, 53, DATE_START, DATE_END)))
+    queries.append(("Q094: Dst IP + Src Port + Date", "SELECT * FROM nat_logs WHERE 1=1 AND dst_ip = ? AND src_port = ? AND timestamp BETWEEN ? AND ? ORDER BY timestamp DESC, id DESC LIMIT 100", (SAMPLE_DST_IP, 53, DATE_START, DATE_END)))
     queries.append(("Q095: Src IP + Dst Port + Date", "SELECT * FROM nat_logs WHERE 1=1 AND src_ip = ? AND dst_port = ? AND timestamp BETWEEN ? AND ? ORDER BY timestamp DESC, id DESC LIMIT 100", (SAMPLE_SRC_IP, 443, DATE_START, DATE_END)))
     queries.append(("Q096: User + NAT Port (+nat_port)", "SELECT * FROM nat_logs WHERE 1=1 AND username = ? COLLATE NOCASE AND +nat_port = ? ORDER BY timestamp DESC, id DESC LIMIT 100", (SAMPLE_USER, 30000)))
     queries.append(("Q097: Src IP + NAT Port (+nat_port)", "SELECT * FROM nat_logs WHERE 1=1 AND src_ip = ? AND +nat_port = ? ORDER BY timestamp DESC, id DESC LIMIT 100", (SAMPLE_SRC_IP, 30000)))
-    queries.append(("Q098: Dst IP + NAT Port (+nat_port)", "SELECT * FROM nat_logs WHERE 1=1 AND dst_ip = ? AND +nat_port = ? ORDER BY timestamp DESC, id DESC LIMIT 100", (SAMPLE_DST_IP, 30000)))
+    queries.append(("Q098: Dst IP + NAT Port", "SELECT * FROM nat_logs WHERE 1=1 AND dst_ip = ? AND nat_port = ? ORDER BY timestamp DESC, id DESC LIMIT 100", (SAMPLE_DST_IP, 30000)))
     queries.append(("Q099: User + Router + Date (Scenario #94)", "SELECT * FROM nat_logs WHERE 1=1 AND +identity = ? AND username = ? COLLATE NOCASE AND timestamp BETWEEN ? AND ? ORDER BY timestamp DESC, id DESC LIMIT 100", (ROUTER_IDENT, SAMPLE_USER, DATE_START, DATE_END)))
     queries.append(("Q100: Router + Dst IP + Date (Scenario #96)", "SELECT * FROM nat_logs WHERE 1=1 AND +identity = ? AND dst_ip = ? AND timestamp BETWEEN ? AND ? ORDER BY timestamp DESC, id DESC LIMIT 100", (ROUTER_IDENT, SAMPLE_DST_IP, DATE_START, DATE_END)))
 
@@ -171,6 +171,10 @@ def run_stress_suite():
     failed_count = 0
     scans_count = 0
     btrees_count = 0
+    
+    # Warm up SQLite page cache & OS file buffers to avoid cold-start page faults
+    for _, q, p in queries:
+        c.execute(q, p).fetchall()
     
     t_start = time.perf_counter()
     

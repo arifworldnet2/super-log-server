@@ -429,10 +429,11 @@ def search_log_view(
                 params.append(start_ts)
                 params.append(end_ts)
 
-            has_selective_filter = bool(c_user or c_src_ip or c_mac or c_dst_ip)
+            # Only suppress router index if high-selectivity IP or MAC is present:
+            has_selective_ip = bool(c_src_ip or c_mac)
+            router_prefix = "+" if has_selective_ip else ""
 
             if c_host:
-                router_prefix = "+" if has_selective_filter else ""
                 if is_ip_address(c_host):
                     query += f" AND {router_prefix}host = ?"
                     params.append(c_host)
@@ -462,7 +463,7 @@ def search_log_view(
                 params.append(c_src_ip)
 
             if c_src_port is not None:
-                src_port_prefix = "+" if (bool(c_dst_ip or c_user or c_mac) and not bool(c_src_ip)) else ""
+                src_port_prefix = "+" if (bool(c_user or c_mac) and not bool(c_src_ip)) else ""
                 query += f" AND {src_port_prefix}src_port = ?"
                 params.append(c_src_port)
 
@@ -482,7 +483,7 @@ def search_log_view(
                 params.append(c_nat_ip)
 
             if c_nat_port is not None:
-                nat_port_prefix = "+" if (bool(c_user or c_src_ip or c_dst_ip or c_mac) and not bool(c_nat_ip)) else ""
+                nat_port_prefix = "+" if (bool(c_user or c_src_ip or c_mac) and not bool(c_nat_ip)) else ""
                 query += f" AND {nat_port_prefix}nat_port = ?"
                 params.append(c_nat_port)
 
@@ -1177,10 +1178,11 @@ def search_logs(
         c_nat_ip = clean_str(nat_ip)
         c_nat_port = clean_int(nat_port)
 
-        has_selective_filter = bool(c_user or c_src_ip or c_mac or c_dst_ip)
+        # Only suppress router index if high-selectivity IP or MAC is present:
+        has_selective_ip = bool(c_src_ip or c_mac)
+        router_prefix = "+" if has_selective_ip else ""
 
         if c_host:
-            router_prefix = "+" if has_selective_filter else ""
             if is_ip_address(c_host):
                 query += f" AND {router_prefix}host = ?"
                 params.append(c_host)
@@ -1210,7 +1212,7 @@ def search_logs(
             params.append(c_src_ip)
 
         if c_src_port is not None:
-            src_port_prefix = "+" if (bool(c_dst_ip or c_user or c_mac) and not bool(c_src_ip)) else ""
+            src_port_prefix = "+" if (bool(c_user or c_mac) and not bool(c_src_ip)) else ""
             query += f" AND {src_port_prefix}src_port = ?"
             params.append(c_src_port)
 
@@ -1230,7 +1232,7 @@ def search_logs(
             params.append(c_nat_ip)
 
         if c_nat_port is not None:
-            nat_port_prefix = "+" if (bool(c_user or c_src_ip or c_dst_ip or c_mac) and not bool(c_nat_ip)) else ""
+            nat_port_prefix = "+" if (bool(c_user or c_src_ip or c_mac) and not bool(c_nat_ip)) else ""
             query += f" AND {nat_port_prefix}nat_port = ?"
             params.append(c_nat_port)
 
@@ -1334,10 +1336,11 @@ def download_excel(
         c_nat_ip = clean_str(nat_ip)
         c_nat_port = clean_int(nat_port)
 
-        has_selective_filter = bool(c_user or c_src_ip or c_mac or c_dst_ip)
+        # Only suppress router index if high-selectivity IP or MAC is present:
+        has_selective_ip = bool(c_src_ip or c_mac)
+        router_prefix = "+" if has_selective_ip else ""
 
         if c_host:
-            router_prefix = "+" if has_selective_filter else ""
             if is_ip_address(c_host):
                 query += f" AND {router_prefix}host = ?"
                 params.append(c_host)
@@ -1367,7 +1370,7 @@ def download_excel(
             params.append(c_src_ip)
 
         if c_src_port is not None:
-            src_port_prefix = "+" if (bool(c_dst_ip or c_user or c_mac) and not bool(c_src_ip)) else ""
+            src_port_prefix = "+" if (bool(c_user or c_mac) and not bool(c_src_ip)) else ""
             query += f" AND {src_port_prefix}src_port = ?"
             params.append(c_src_port)
 
@@ -1387,7 +1390,7 @@ def download_excel(
             params.append(c_nat_ip)
 
         if c_nat_port is not None:
-            nat_port_prefix = "+" if (bool(c_user or c_src_ip or c_dst_ip or c_mac) and not bool(c_nat_ip)) else ""
+            nat_port_prefix = "+" if (bool(c_user or c_src_ip or c_mac) and not bool(c_nat_ip)) else ""
             query += f" AND {nat_port_prefix}nat_port = ?"
             params.append(c_nat_port)
 
