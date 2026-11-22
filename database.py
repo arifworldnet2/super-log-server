@@ -59,26 +59,6 @@ def init_db():
     )
     """)
 
-    # Ensure columns exist if table was created previously
-    cursor.execute("PRAGMA table_info(routers)")
-    existing_cols = [row[1] for row in cursor.fetchall()]
-    if "api_port" not in existing_cols:
-        cursor.execute("ALTER TABLE routers ADD COLUMN api_port INTEGER DEFAULT 8728")
-    if "api_username" not in existing_cols:
-        cursor.execute("ALTER TABLE routers ADD COLUMN api_username TEXT")
-    if "api_password" not in existing_cols:
-        cursor.execute("ALTER TABLE routers ADD COLUMN api_password TEXT")
-
-    # Ensure online_users has byte columns
-    cursor.execute("PRAGMA table_info(online_users)")
-    online_cols = [row[1] for row in cursor.fetchall()]
-    if "upload_bytes" not in online_cols:
-        cursor.execute("ALTER TABLE online_users ADD COLUMN upload_bytes INTEGER DEFAULT 0")
-    if "download_bytes" not in online_cols:
-        cursor.execute("ALTER TABLE online_users ADD COLUMN download_bytes INTEGER DEFAULT 0")
-    if "session_id" not in online_cols:
-        cursor.execute("ALTER TABLE online_users ADD COLUMN session_id TEXT")
-
     # Host Activity Table
     cursor.execute("""
     CREATE TABLE IF NOT EXISTS host_activities (
@@ -91,11 +71,6 @@ def init_db():
         status TEXT DEFAULT 'Success'
     )
     """)
-
-    cursor.execute("PRAGMA table_info(host_activities)")
-    host_cols = [row[1] for row in cursor.fetchall()]
-    if "size" not in host_cols:
-        cursor.execute("ALTER TABLE host_activities ADD COLUMN size TEXT DEFAULT '-'")
 
     # Online Users Table
     cursor.execute("""
@@ -110,9 +85,39 @@ def init_db():
         upload TEXT NOT NULL,
         download TEXT NOT NULL,
         identity TEXT NOT NULL,
-        host TEXT NOT NULL
+        host TEXT NOT NULL,
+        upload_bytes INTEGER DEFAULT 0,
+        download_bytes INTEGER DEFAULT 0,
+        session_id TEXT
     )
     """)
+
+    # Ensure columns exist if table was created with an older schema previously
+    cursor.execute("PRAGMA table_info(routers)")
+    existing_cols = [row[1] for row in cursor.fetchall()]
+    if existing_cols:
+        if "api_port" not in existing_cols:
+            cursor.execute("ALTER TABLE routers ADD COLUMN api_port INTEGER DEFAULT 8728")
+        if "api_username" not in existing_cols:
+            cursor.execute("ALTER TABLE routers ADD COLUMN api_username TEXT")
+        if "api_password" not in existing_cols:
+            cursor.execute("ALTER TABLE routers ADD COLUMN api_password TEXT")
+
+    cursor.execute("PRAGMA table_info(online_users)")
+    online_cols = [row[1] for row in cursor.fetchall()]
+    if online_cols:
+        if "upload_bytes" not in online_cols:
+            cursor.execute("ALTER TABLE online_users ADD COLUMN upload_bytes INTEGER DEFAULT 0")
+        if "download_bytes" not in online_cols:
+            cursor.execute("ALTER TABLE online_users ADD COLUMN download_bytes INTEGER DEFAULT 0")
+        if "session_id" not in online_cols:
+            cursor.execute("ALTER TABLE online_users ADD COLUMN session_id TEXT")
+
+    cursor.execute("PRAGMA table_info(host_activities)")
+    host_cols = [row[1] for row in cursor.fetchall()]
+    if host_cols:
+        if "size" not in host_cols:
+            cursor.execute("ALTER TABLE host_activities ADD COLUMN size TEXT DEFAULT '-'")
 
     # NAT Logs Table
     cursor.execute("""
