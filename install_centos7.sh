@@ -44,8 +44,8 @@ yum install -y openssl11 openssl11-devel libffi-devel bzip2-devel wget sqlite-de
 
 # Step 3: Check or Compile Python 3.10 with OpenSSL 1.1
 echo "[3/7] Setting up Python 3.10..."
-if ! command -v python3.10 &> /dev/null; then
-    echo "[*] Compiling Python 3.10.14 with OpenSSL 1.1..."
+if ! command -v python3.10 &> /dev/null || ! python3.10 -c "import ssl" &> /dev/null; then
+    echo "[*] Compiling Python 3.10.14 with OpenSSL 1.1 and runtime rpath..."
     
     # Setup OpenSSL 1.1 unified layout
     mkdir -p /usr/local/openssl11
@@ -62,7 +62,7 @@ if ! command -v python3.10 &> /dev/null; then
     cd Python-3.10.14
     export CFLAGS=$(pkg-config --cflags openssl11 2>/dev/null || echo "-I/usr/include/openssl11")
     export LDFLAGS=$(pkg-config --libs openssl11 2>/dev/null || echo "-L/usr/lib64/openssl11 -lssl -lcrypto")
-    ./configure --prefix=/usr/local --with-openssl=/usr/local/openssl11
+    ./configure --prefix=/usr/local --with-openssl=/usr/local/openssl11 --with-openssl-rpath=auto
     make altinstall -j$(nproc)
     
     ln -sf /usr/local/bin/python3.10 /usr/bin/python3.10
@@ -72,7 +72,7 @@ if ! command -v python3.10 &> /dev/null; then
     rm -rf /usr/src/Python-3.10.14*
 fi
 
-python3.10 --version
+python3.10 -c "import ssl; print('Python 3.10 SSL Verified:', ssl.OPENSSL_VERSION)"
 
 # Step 4: Setup Project Directory
 echo "[4/7] Deploying Super LOG Server..."
@@ -80,7 +80,7 @@ INSTALL_DIR="/opt/super-log-server"
 if [ -d "$INSTALL_DIR/.git" ]; then
     echo "[*] Updating existing repository..."
     cd "$INSTALL_DIR"
-    git pull origin main
+    git pull origin main || true
 else
     echo "[*] Cloning repository..."
     rm -rf "$INSTALL_DIR"
@@ -90,6 +90,7 @@ fi
 
 # Step 5: Setup Virtual Environment & Install Packages
 echo "[5/7] Installing Python dependencies..."
+rm -rf "$INSTALL_DIR/venv"
 python3.10 -m venv "$INSTALL_DIR/venv"
 "$INSTALL_DIR/venv/bin/pip" install --upgrade pip
 "$INSTALL_DIR/venv/bin/pip" install -r "$INSTALL_DIR/requirements.txt"
